@@ -1,0 +1,357 @@
+"""Two local miners and one validator. Signed announcements, HTTP artifacts, dry-run rewards."""
+import argparse
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import ipaddress
+import math
+import os
+from pathlib import Path
+import re
+import secrets
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+from urllib.request import build_opener, HTTPRedirectHandler, ProxyHandler, Request
+import uuid
+
+from bittensor_wallet import Keypair
+import fez
+
+BASE_REVISION = "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68"
+MAX_ANNOUNCEMENT = 8192
+
+
+def canonical(claim):
+    return b"fez-local-checkpoint/v1\0" + json.dumps(claim, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+
+
+def endpoint_ok(endpoint, allowed=None):
+    match = re.fullmatch(r"http://([0-9.]+):([1-9][0-9]{0,4})", endpoint) if isinstance(endpoint, str) else None
+    if not match or int(match[2]) > 65535:
+        raise ValueError("endpoint must be http://<numeric-IPv4>:<port>")
+    address = ipaddress.IPv4Address(match[1])
+    if allowed is None:
+        if str(address) != "127.0.0.1":
+            raise ValueError("remote endpoints require an explicit pin")
+    elif (endpoint not in allowed or not (address.is_private or address.is_loopback)
+          or address.is_link_local or address.is_unspecified or address.is_multicast or address.is_reserved):
+        raise ValueError("endpoint must match a pinned private IPv4 address")
+
+
+def register(message, round_id, members, registry, endpoints=None):
+    if not isinstance(message, dict) or set(message) != {"claim", "signature"}:
+        raise ValueError("announcement requires claim and signature")
+    c, signature = message["claim"], message["signature"]
+    if not isinstance(c, dict) or set(c) != {"round_id", "uid", "hotkey", "sha256", "endpoint"}:
+        raise ValueError("invalid claim fields")
+    uid = c["uid"]
+    if type(uid) is not int or uid not in members or c["hotkey"] != members[uid]:
+        raise ValueError("identity is not in this rehearsal's allowlist")
+    if c["round_id"] != round_id:
+        raise ValueError("announcement belongs to another round")
+    if not isinstance(c["sha256"], str) or not re.fullmatch("[a-f0-9]{64}", c["sha256"]):
+        raise ValueError("invalid checkpoint hash")
+    endpoint_ok(c["endpoint"], allowed=[endpoints[uid]] if endpoints is not None else None)
+    if not isinstance(signature, str) or not re.fullmatch("[a-f0-9]{128}", signature):
+        raise ValueError("invalid signature format")
+    if not Keypair(ss58_address=c["hotkey"]).verify(canonical(c), bytes.fromhex(signature)):
+        raise ValueError("signature verification failed")
+    if uid in registry and registry[uid]["claim"] != c:
+        raise ValueError("a miner cannot change its submission within a round")
+    if any(other != uid and entry["claim"]["sha256"] == c["sha256"] for other, entry in registry.items()):
+        raise ValueError("duplicate checkpoint from another miner")
+    registry[uid] = {"claim": dict(c), "signature": signature}
+    return c
+
+
+def write_json(path, data):
+    payload = json.dumps(data, indent=2, allow_nan=False) + "\n"
+    path = Path(path)
+    temporary = path.with_name("." + path.name + "." + uuid.uuid4().hex)
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w") as output:
+            output.write(payload); output.flush(); os.fsync(output.fileno())
+        # Publish complete state atomically; link refuses to overwrite an earlier round.
+        os.link(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+class Handler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(5)
+
+    def log_message(self, *args):
+        pass
+
+    def reply(self, status, data):
+        body = json.dumps(data).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers(); self.wfile.write(body)
+
+
+@contextmanager
+def local_server(handler, host="127.0.0.1", port=0):
+    with HTTPServer((host, port), handler) as server:
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .1}, daemon=True)
+        thread.start()
+        try:
+            yield f"http://{host}:{server.server_port}"
+        finally:
+            server.shutdown(); thread.join(timeout=6)
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        raise ValueError("artifact and announcement redirects are forbidden")
+
+
+def opener():
+    return build_opener(ProxyHandler({}), NoRedirect())
+
+
+def fetch_checkpoint(claim, destination, expected_endpoint=None, round_scoped=False):
+    endpoint_ok(claim["endpoint"], allowed=[expected_endpoint] if expected_endpoint is not None else None)
+    if round_scoped and not re.fullmatch("[a-f0-9]{32}", claim["round_id"]):
+        raise ValueError("invalid artifact round id")
+    prefix = "/artifacts/" + (claim["round_id"] + "/" if round_scoped else "")
+    destination = Path(destination); destination.mkdir()
+    started, total = time.monotonic(), 0
+    for name in fez.ARTIFACT_FILES:
+        with opener().open(claim["endpoint"] + prefix + name, timeout=5) as response:
+            size = int(response.headers.get("Content-Length", "-1"))
+            if not 0 <= size <= fez.MAX_ARTIFACT_BYTES - total:
+                raise ValueError("invalid artifact size or checkpoint exceeds byte budget")
+            received = 0
+            with (destination / name).open("xb") as output:
+                while chunk := response.read(1024 * 1024):
+                    received += len(chunk)
+                    if received > size or time.monotonic() - started > 30:
+                        raise ValueError("artifact exceeds declared size or download deadline")
+                    output.write(chunk)
+            if received != size:
+                raise ValueError("truncated artifact")
+            total += received
+    if fez.checkpoint_hash(destination) != claim["sha256"]:
+        raise ValueError("downloaded checkpoint hash differs from signed announcement")
+    return {"bytes": total, "download_ms": (time.monotonic() - started) * 1000}
+
+
+def miner(config):
+    work = Path(config["work"])
+    key = Keypair.create_from_seed(config["seed"])
+    entry = fez.submission(config["checkpoint"], config["uid"])
+    checkpoint = work / "artifacts"
+    fez.stage(entry, checkpoint)
+
+    class Artifacts(Handler):
+        def do_GET(self):
+            files = {"/artifacts/" + name: checkpoint / name for name in fez.ARTIFACT_FILES}
+            if self.path not in files:
+                self.reply(404, {"error": "unknown artifact"}); return
+            with files[self.path].open("rb") as source:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(os.fstat(source.fileno()).st_size))
+                self.end_headers(); shutil.copyfileobj(source, self.wfile)
+
+    endpoint_ok(config["validator"])
+    with local_server(Artifacts) as endpoint:
+        claim = {"round_id": config["round_id"], "uid": config["uid"], "hotkey": key.ss58_address,
+                 "sha256": entry["sha256"], "endpoint": endpoint}
+        message = {"claim": claim, "signature": key.sign(canonical(claim)).hex()}
+        write_json(work / "announcement.json", message)
+        request = Request(config["validator"] + "/submit", json.dumps(message).encode(),
+                          {"Content-Type": "application/json"}, method="POST")
+        with opener().open(request, timeout=10) as response:
+            if json.loads(response.read(MAX_ANNOUNCEMENT))["status"] != "accepted":
+                raise ValueError("validator did not accept the submission")
+        print(f"miner {config['uid']}: signed checkpoint announced at {endpoint}", flush=True)
+        # The launcher terminates this process after evaluation, or on any failure.
+        threading.Event().wait()
+
+
+def validator(config):
+    work = Path(config["work"])
+    cases = [json.loads(line) for line in Path(config["cases"]).read_text().splitlines() if line.strip()]
+    fez.validate_cases(cases)
+    members = {int(uid): key for uid, key in config["members"].items()}
+    if len(members) != 2 or len(set(members.values())) != 2 or any(not 0 <= uid <= 65535 for uid in members):
+        raise ValueError("this rehearsal requires two unique local identities")
+    registry, condition = {}, threading.Condition()
+
+    class Announcements(Handler):
+        def do_POST(self):
+            if self.path != "/submit":
+                self.reply(404, {"error": "unknown endpoint"}); return
+            try:
+                size = int(self.headers.get("Content-Length", "-1"))
+                if not 0 < size <= MAX_ANNOUNCEMENT or self.headers.get("Transfer-Encoding"):
+                    raise ValueError("invalid announcement size")
+                message = json.loads(self.rfile.read(size))
+                with condition:
+                    claim = register(message, config["round_id"], members, registry)
+                    condition.notify_all()
+                self.reply(200, {"status": "accepted", "uid": claim["uid"]})
+                print(f"validator: authenticated miner {claim['uid']}", flush=True)
+            except (ValueError, TypeError, KeyError, OSError) as error:
+                self.reply(400, {"error": str(error)[:300]})
+
+    with local_server(Announcements) as endpoint:
+        write_json(work / "ready.json", {"endpoint": endpoint, "round_id": config["round_id"]})
+        deadline = time.monotonic() + 60
+        with condition:
+            while len(registry) < len(members):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RuntimeError("timed out waiting for both miners to announce")
+                condition.wait(min(remaining, 1))
+    write_json(work / "announcements.json", [registry[uid] for uid in sorted(registry)])
+    downloads = work / "downloads"; downloads.mkdir()
+    entries, participants, failed = [], [], {}
+    for uid in sorted(registry):
+        c = registry[uid]["claim"]
+        path = downloads / str(uid)
+        participant = {**c, "signature_verified": True}
+        try:
+            participant.update(fetch_checkpoint(c, path))
+            print(f"validator: verified checkpoint bytes for miner {uid}", flush=True)
+        except (ValueError, OSError) as error:
+            failed[uid] = f"artifact download rejected: {error}"
+            # A missing path makes the existing evaluator reject this candidate.
+            path = downloads / f"rejected-{uid}"
+            participant["download_error"] = failed[uid]
+        entries.append({"uid": uid, "checkpoint": str(path), "sha256": c["sha256"]})
+        participants.append(participant)
+    write_json(work / "submissions.json", entries)
+    args = argparse.Namespace(cases=config["cases"], submissions=str(work / "submissions.json"),
+                              base_revision=config["base_revision"], device=config["device"],
+                              runner_python=config["runner_python"], timeout=config["timeout"],
+                              report=str(work / "evaluation.json"))
+    fez.evaluate(args)
+    report = json.loads((work / "evaluation.json").read_text())
+    for row in report["miners"]:
+        if row["uid"] in failed:
+            row["error"] = failed[row["uid"]]
+    report.update(mode="local-network-rehearsal", round_id=config["round_id"],
+                  identity_source="local-allowlist", chain_write=False, participants=participants)
+    write_json(work / "report.json", report)
+    print("validator: completed local reward allocation", flush=True)
+
+
+def run(args):
+    root = Path(args.out).resolve(); root.mkdir(mode=0o700, parents=True, exist_ok=False)
+    round_id = uuid.uuid4().hex
+    cases = [json.loads(line) for line in Path(args.cases).read_text().splitlines() if line.strip()]
+    fez.validate_cases(cases)
+    entries = [fez.submission(path, uid) for uid, path in enumerate(args.checkpoints, 1)]
+    fez.validate_submissions(entries)
+    work = root / "validator"; work.mkdir(mode=0o700)
+    private_cases = work / "cases.jsonl"
+    private_cases.write_text("\n".join(json.dumps(case) for case in cases) + "\n")
+    seeds = ["0x" + secrets.token_hex(32) for _ in entries]
+    members = {entry["uid"]: Keypair.create_from_seed(seed).ss58_address for entry, seed in zip(entries, seeds)}
+    config = {"work": str(work), "cases": str(private_cases), "members": members, "round_id": round_id,
+              "base_revision": args.base_revision, "device": args.device, "timeout": args.timeout,
+              # Preserve a venv's executable symlink: resolving it discards its installed packages.
+              "runner_python": str(Path(args.runner_python).absolute())}
+    write_json(work / "config.json", config)
+    children, logs, processes = [], [], []
+
+    def launch(role, directory):
+        log = (directory / "process.log").open("x"); logs.append(log)
+        process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), role, "--config", str(directory / "config.json")],
+                                   stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        children.append(process)
+        processes.append({"role": role if role == "validator" else directory.name, "pid": process.pid})
+        return process
+
+    try:
+        validating = launch("validator", work)
+        deadline = time.monotonic() + 30
+        while True:
+            if validating.poll() is not None:
+                raise RuntimeError(f"validator exited during startup; inspect {work / 'process.log'}")
+            try:
+                ready = json.loads((work / "ready.json").read_text()); break
+            except (FileNotFoundError, json.JSONDecodeError):
+                if time.monotonic() > deadline:
+                    raise RuntimeError("validator startup timed out")
+                time.sleep(.1)
+        for entry, seed in zip(entries, seeds):
+            directory = root / f"miner-{entry['uid']}"; directory.mkdir(mode=0o700)
+            write_json(directory / "config.json", {"work": str(directory), "uid": entry["uid"], "seed": seed,
+                       "checkpoint": entry["checkpoint"], "round_id": round_id, "validator": ready["endpoint"]})
+            launch("miner", directory)
+        write_json(root / "processes.json", processes)
+        print("Two miner processes started; validator is discovering signed submissions.", flush=True)
+        deadline = time.monotonic() + 120 + len(entries) * args.timeout
+        while validating.poll() is None:
+            if any(p.poll() is not None for p in children[1:]):
+                raise RuntimeError(f"a miner exited early; inspect miner process.log files in {root}")
+            if time.monotonic() > deadline:
+                raise RuntimeError("rehearsal exceeded its deadline")
+            time.sleep(.2)
+        if validating.returncode:
+            raise RuntimeError(f"validator failed; inspect {work / 'process.log'}")
+        report = json.loads((work / "report.json").read_text())
+        print(json.dumps({"report": str(work / "report.json"), "weights": report["weights"],
+                          "evaluated": sum(m["status"] == "evaluated" for m in report["miners"])}))
+    finally:
+        for process in children:
+            # Each actor owns a process group, including the validator's model workers.
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        for process in children:
+            try:
+                process.wait(timeout=6)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait(timeout=6)
+        for log in logs:
+            log.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    launch = commands.add_parser("run")
+    launch.add_argument("--checkpoints", nargs=2, default=["models/reference", "models/fez-local-probe"])
+    launch.add_argument("--cases", default="examples/diagnostics.jsonl")
+    launch.add_argument("--out", required=True)
+    launch.add_argument("--device", choices=("cpu", "mps", "cuda"), default="cpu")
+    launch.add_argument("--runner-python", default=sys.executable)
+    launch.add_argument("--base-revision", default=BASE_REVISION)
+    launch.add_argument("--timeout", type=float, default=600)
+    for role in ("miner", "validator"):
+        commands.add_parser(role).add_argument("--config", required=True)
+    args = parser.parse_args()
+    try:
+        if args.command == "run":
+            if os.name != "posix":
+                raise ValueError("the rehearsal launcher requires macOS, Linux, or WSL")
+            if not math.isfinite(args.timeout) or args.timeout <= 0:
+                raise ValueError("timeout must be positive and finite")
+            run(args)
+        else:
+            config = json.loads(Path(args.config).read_text())
+            (miner if args.command == "miner" else validator)(config)
+    except (ValueError, OSError, RuntimeError) as error:
+        parser.exit(1, f"fez rehearsal: {error}\n")
+
+
+if __name__ == "__main__":
+    main()

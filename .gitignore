@@ -1,0 +1,16 @@
+__pycache__/
+.venv*/
+models/
+submissions*.json
+round*.json
+.cache/
+.python/
+.deps/
+runs/
+.private/
+.DS_Store
+.env
+.env.*
+!.env.example
+# Local PC bootstrap contains this operator's SSH configuration.
+/setup-windows-ssh.ps1

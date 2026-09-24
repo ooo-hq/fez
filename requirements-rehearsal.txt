@@ -1,0 +1,2 @@
+# Hotkey signing only; this rehearsal does not require the chain SDK.
+bittensor-wallet==4.1.1
