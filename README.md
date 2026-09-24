@@ -9,17 +9,19 @@ experimental candidate. [Experiment results](experiments.md#first-trained-candid
 record that tradeoff. Kev supplies the model implementation, while this repository
 supplies the local submission and scoring loop.
 
-A new Python implementation for the decision-model vertical, intended for Fez's
-existing **testnet subnet 553**. No Bazaar runtime is imported.
+A new Python implementation for the decision-model vertical. Fez will use a
+fresh testnet subnet; the existing Bazaar subnet 553 remains separate. No Bazaar
+runtime is imported.
 
-The implemented slice is local: signed miner announcements, checkpoint transfer,
+The implemented loop includes signed miner announcements, checkpoint transfer,
 validator-owned inference, probability scoring, and a dry-run weight vector.
-Miner identities come from a local allowlist. It does not read chain registration,
-publish on-chain commitments or weights, or replace a deployed service.
+An optional [testnet mode](TESTNET.md) checks registered hotkeys and can
+publish weights through the pinned Bittensor SDK. The default remains local.
+The subnet ID must be explicit. Mainnet is rejected.
 
 ## Next milestones and planned dashboard
 
-This repository versions the local prototype before deployment to testnet 553.
+This repository versions the local prototype and testnet integration before deployment.
 It includes source, tests, pinned dependencies, setup instructions, and
 experiment summaries. Keep wallets, signing
 keys, machine-specific bundles, private evaluation data, model checkpoints,
@@ -32,10 +34,10 @@ include trained Fez candidates or the private evaluation data. The runtime
 setup below downloads the pinned public reference; `benchmark.py` and `fleet.py`
 generate new local benchmark and miner bundles.
 
-Testnet migration still needs live chain identity/discovery and weight
-publication; the current LAN allowlist and dry-run weights do not implement
-those. Deploy a tagged version for a bounded testnet rehearsal before treating
-the service as an open competition.
+Testnet integration uses a configured roster of registered hotkeys and the
+existing private LAN transport. It still needs matching wallet files and a
+bounded live training-to-chain rehearsal. Public discovery, an open competition
+sandbox, and continuous deployment are not implemented. See [TESTNET.md](TESTNET.md).
 
 Dashboard requirements saved from the Teutonic discussion (2026-09-24):
 

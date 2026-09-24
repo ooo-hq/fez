@@ -1,0 +1,2 @@
+# Same chain SDK as the existing subnet-553 validator. Model dependencies stay unchanged.
+bittensor==11.1.0
