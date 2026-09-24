@@ -9,10 +9,10 @@ import unittest
 from unittest.mock import patch
 
 
-@unittest.skipUnless(importlib.util.find_spec("bittensor"), "install requirements-testnet.txt")
+@unittest.skipUnless(importlib.util.find_spec("bittensor"), "install requirements/testnet.txt")
 class TestnetTest(unittest.TestCase):
     def test_registration_and_publication_fail_closed(self):
-        import testnet as t
+        from fez import testnet as t
         from bittensor.result import ExtrinsicResult
         config = {"chain": {"network": "test", "netuid": 553}, "validator_hotkey": "validator",
                   "members": {"1": {"hotkey": "miner-a", "port": 8901}, "2": {"hotkey": "miner-b", "port": 8902}}}
@@ -127,10 +127,10 @@ class TestnetTest(unittest.TestCase):
             self.assertEqual(receipt["netuid"], 777)
 
     def test_wallet_signing_and_bundles_keep_keys_out(self):
-        import benchmark
+        from fez import benchmark
         import fez
-        import fleet
-        import rehearsal
+        from fez import fleet, runtime
+        from fez import protocol as rehearsal
         from bittensor.wallet import Wallet
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -152,9 +152,9 @@ class TestnetTest(unittest.TestCase):
             for uid in (9, 10):
                 cfg = json.loads((out / f"miner-{uid}/config.json").read_text())
                 self.assertNotIn("seed", cfg)
-                key = fleet.signing_key(cfg)
-                message = fleet.signed({"hello": "Fez"}, key)
-                self.assertEqual(fleet.verified(message, cfg["hotkey"]), {"hello": "Fez"})
+                key = runtime.signing_key(cfg)
+                message = runtime.signed({"hello": "Fez"}, key)
+                self.assertEqual(runtime.verified(message, cfg["hotkey"]), {"hello": "Fez"})
                 claim = {"uid": uid, "hotkey": cfg["hotkey"], "round_id": "a" * 32,
                          "sha256": "b" * 64, "endpoint": "http://127.0.0.1:8901"}
                 rehearsal.register({"claim": claim, "signature": key.sign(rehearsal.canonical(claim)).hex()},
@@ -163,7 +163,7 @@ class TestnetTest(unittest.TestCase):
                 with tarfile.open(out / f"miner-{uid}.tar.gz") as archive:
                     self.assertFalse(any("wallets/" in n or "/hotkeys/" in n or "test.jsonl" in n for n in archive.getnames()))
                 cfg["hotkey"] = roster[0]["hotkey"]
-                with self.assertRaises(ValueError): fleet.signing_key(cfg)
+                with self.assertRaises(ValueError): runtime.signing_key(cfg)
 
 
 if __name__ == "__main__":

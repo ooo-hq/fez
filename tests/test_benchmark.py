@@ -12,8 +12,8 @@ import fez
 
 class BenchmarkTest(unittest.TestCase):
     def module(self):
-        self.assertIsNotNone(importlib.util.find_spec("benchmark"), "benchmark builder is missing")
-        import benchmark
+        self.assertIsNotNone(importlib.util.find_spec("fez.benchmark"), "benchmark builder is missing")
+        from fez import benchmark
         return benchmark
 
     def test_rule_boundaries_have_independent_answers(self):

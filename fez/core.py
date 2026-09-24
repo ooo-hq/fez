@@ -13,6 +13,8 @@ import subprocess
 import sys
 import tempfile
 
+from . import ROOT
+
 ARTIFACT_FILES = ("adapter_config.json", "adapter_model.safetensors", "head.pt")
 MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
 BASE = "Qwen/Qwen3.5-0.8B-Base"
@@ -178,7 +180,7 @@ def evaluate(args):
     runner = Path(__file__).with_name("kev_runner.py")
     environment = {**os.environ, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
                    "TORCH_FORCE_WEIGHTS_ONLY_LOAD": "1", "HF_HUB_DISABLE_TELEMETRY": "1",
-                   "HF_HOME": os.environ.get("HF_HOME", str(Path(__file__).resolve().parent / ".cache/huggingface"))}
+                   "HF_HOME": os.environ.get("HF_HOME", str(ROOT / ".cache/huggingface"))}
     rows = []
     for entry in entries:
         row = {"uid": entry["uid"], "sha256": entry["sha256"]}

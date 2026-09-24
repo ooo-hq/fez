@@ -7,15 +7,15 @@ from pathlib import Path
 import tempfile
 import unittest
 
-import benchmark
+from fez import benchmark
 import fez
 
 
 @unittest.skipUnless(importlib.util.find_spec("kev"), "use .venv-kev for calibration checks")
 class CalibrationTest(unittest.TestCase):
     def test_calibration_uses_only_matching_raw_development_predictions(self):
-        self.assertIsNotNone(importlib.util.find_spec("calibrate"), "calibration adapter is missing")
-        import calibrate
+        self.assertIsNotNone(importlib.util.find_spec("fez.calibrate"), "calibration adapter is missing")
+        from fez import calibrate
         import torch
         from kev.checkpoint import Meta, read_meta, write_meta
 

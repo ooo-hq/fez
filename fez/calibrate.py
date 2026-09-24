@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-import benchmark
+from . import benchmark
 import fez
 
 

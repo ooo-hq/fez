@@ -93,7 +93,7 @@ class LocalSubnetTest(unittest.TestCase):
             manifest = root / "manifest.json"; manifest.write_text(json.dumps([submission]))
             data = root / "cases.jsonl"; data.write_text("\n".join(map(json.dumps, cases)))
             # Changed artifacts are disqualified before Kev can execute.
-            result = subprocess.run([sys.executable, "fez.py", "evaluate", "--submissions", str(manifest),
+            result = subprocess.run([sys.executable, "-m", "fez", "evaluate", "--submissions", str(manifest),
                                      "--cases", str(data), "--base-revision", "a" * 40, "--report", str(report)],
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -107,7 +107,7 @@ class LocalSubnetTest(unittest.TestCase):
             fresh = fez.submission(checkpoint, 4)
             manifest.write_text(json.dumps([fresh]))
             failed_report = root / "setup-failure.json"
-            result = subprocess.run([sys.executable, "fez.py", "evaluate", "--submissions", str(manifest),
+            result = subprocess.run([sys.executable, "-m", "fez", "evaluate", "--submissions", str(manifest),
                                      "--cases", str(data), "--base-revision", "a" * 40,
                                      "--runner-python", str(root / "missing-python"), "--report", str(failed_report)],
                                     capture_output=True, text=True, timeout=10)

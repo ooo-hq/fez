@@ -4,7 +4,7 @@ The local benchmark is built and verified at `.private/benchmarks/fez-v1-002`.
 Start with its integrity check:
 
 ```bash
-.venv-kev/bin/python benchmark.py audit --benchmark .private/benchmarks/fez-v1-002
+.venv-kev/bin/python -m fez.benchmark audit --benchmark .private/benchmarks/fez-v1-002
 ```
 
 The purpose is to compare updates to the same Fez model on explicit decision
@@ -82,14 +82,14 @@ case files are byte-for-byte identical to the first frozen bundle. Keep using
 Run a submitted checkpoint against this exact test set with the existing CLI:
 
 ```bash
-PYTORCH_ENABLE_MPS_FALLBACK=1 .venv-kev/bin/python fez.py evaluate \
+PYTORCH_ENABLE_MPS_FALLBACK=1 .venv-kev/bin/python -m fez evaluate \
   --submissions submissions-reference.json \
   --cases .private/benchmarks/fez-v1-002/test.jsonl \
   --base-revision dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68 \
   --runner-python .venv-kev/bin/python --device mps \
   --report .private/benchmarks/fez-v1-002/repeat-test.json
 
-.venv-kev/bin/python benchmark.py summarize \
+.venv-kev/bin/python -m fez.benchmark summarize \
   --benchmark .private/benchmarks/fez-v1-002 \
   --report .private/benchmarks/fez-v1-002/repeat-test.json \
   --out .private/benchmarks/fez-v1-002/repeat-summary.json
@@ -99,11 +99,10 @@ Use fresh report filenames. Summarizing a report from another dataset fails.
 Reports recompute metrics from saved probabilities, with family and variant
 breakdowns, pair agreement, and the fraction of pairs with both answers correct.
 The network rehearsal can use this same file through its existing `--cases`
-argument. `rehearsal.py` runs two local miners with existing checkpoints;
-the [persistent fleet](FLEET.md) supplies three miners that train and submit
+argument. `scripts.rehearsal` runs two local miners with existing checkpoints;
+the [persistent fleet](mining.md) supplies three miners that train and submit
 automatically. Its repeated rounds reuse this frozen set as development data.
-The Mac mini has completed setup and a real cross-machine round. The Windows
-RTX 4090 PC still needs its one-time machine setup.
+Both the Mac mini and Windows RTX 4090 PC have completed real cross-machine rounds.
 
 ## Baseline result
 
@@ -147,7 +146,7 @@ refresh the held-out scenarios before claiming fresh generalization.
 
 ## Calibrating a candidate
 
-`calibrate.py` uses the installed Kev temperature fitter and writes a new
+`fez.calibrate` uses the installed Kev temperature fitter and writes a new
 checkpoint copy. It accepts only predictions from this bundle's calibration
 split at temperature 1.0, checks that they belong to the supplied checkpoint,
 and refuses to overwrite a destination. The adapter and head tensors stay
@@ -164,7 +163,7 @@ better fit need not also lower Brier loss on every set.
 For example, after the first experiment's raw calibration evaluation:
 
 ```bash
-.venv-kev/bin/python calibrate.py \
+.venv-kev/bin/python -m fez.calibrate \
   --benchmark .private/benchmarks/fez-v1-002 \
   --report runs/fez-candidate-001/calibration-raw.json --uid 2 \
   --checkpoint models/fez-candidate-001 \

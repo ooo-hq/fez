@@ -12,7 +12,7 @@ import unittest
 @unittest.skipUnless(importlib.util.find_spec("bittensor_wallet"), "use .venv-kev for network tests")
 class RehearsalTest(unittest.TestCase):
     def test_signed_discovery_and_download(self):
-        import rehearsal as r
+        from fez import protocol as r
         import fez
         from bittensor_wallet import Keypair
         from http.server import BaseHTTPRequestHandler
@@ -62,7 +62,6 @@ class RehearsalTest(unittest.TestCase):
                 r.fetch_checkpoint({**item, "sha256": "c" * 64}, root / "corrupt")
 
     def test_two_miner_processes_one_validator(self):
-        import rehearsal
         import fez
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -92,7 +91,7 @@ print(json.dumps({'predictions': predictions, 'runtime': {'fixture': True}}))
             environment = root / "fixture-env"; environment.mkdir()
             interpreter = environment / "python"; interpreter.symlink_to(worker)
             output = root / "run"
-            command = [sys.executable, str(Path(rehearsal.__file__)), "run", "--checkpoints", *checkpoints,
+            command = [sys.executable, "-m", "scripts.rehearsal", "run", "--checkpoints", *checkpoints,
                        "--cases", str(cases), "--runner-python", str(interpreter), "--out", str(output)]
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

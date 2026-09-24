@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 
 import fez
-import rehearsal as wire
 
 ENDPOINT = "wss://test.finney.opentensor.ai:443"
 
@@ -24,7 +23,7 @@ def check_config(config):
 def connect(config):
     netuid = check_config(config)
     if version("bittensor") != "11.1.0":
-        raise ValueError("install requirements-testnet.txt (bittensor 11.1.0)")
+        raise ValueError("install requirements/testnet.txt (bittensor 11.1.0)")
     import bittensor as bt
     with bt.Subtensor(network="test", fallback_endpoints=[], archive_endpoints=[],
                       policy=bt.Policy(allowed_netuids=[netuid])) as sub:
@@ -75,6 +74,7 @@ def preflight(config, sub):
 def publish_round(config, work, report, sub, wallet, *, publish=False):
     """Persist intent before signing. An interrupted submission is never retried automatically."""
     import bittensor as bt
+    from . import protocol as wire
     work = Path(work)
     report_hash = hashlib.sha256(json.dumps(report, sort_keys=True, allow_nan=False).encode()).hexdigest()
     receipt_path, attempt_path = work / "chain-receipt.json", work / "chain-attempt.json"
@@ -162,9 +162,9 @@ def main():
             else:
                 if not args.round:
                     raise ValueError("--round is required")
-                import fleet
+                from .runtime import locked
                 work = Path(args.round)
-                with fleet.locked(work / "chain.lock"):
+                with locked(work / "chain.lock"):
                     if args.action == "publish":
                         from bittensor.wallet import Wallet
                         result = publish_round(config, work, json.loads((work / "report.json").read_text()),

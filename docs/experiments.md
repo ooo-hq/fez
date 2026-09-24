@@ -128,7 +128,7 @@ The new synthetic benchmark separates 224 training, 112 calibration, and 224 tes
 
 The published checkpoint, with its original temperature, scored 146/224 (65.18%) overall and 80/112 (71.43%) on clean questions. Mean family Brier loss was 0.458716 against uniform 0.645833. No wrong answer had at least 90% confidence. Both members of 58/112 pairs were correct; 81/112 pairs received the same answer. Median inference latency was 173.0 ms, p95 177.0 ms, and model load 1.65 seconds on the M4 Pro FP32 path. These are measurements for a different workload from the earlier 40-case diagnostic; no Jev comparison was performed.
 
-Per-family correct counts: policy 42/64, routing 44/64, evidence 21/48, severity 39/48. These are the initial reference scores, not a comparison with a newly trained update. The four-example probe was not selected or tuned on this benchmark. [BENCHMARK.md](BENCHMARK.md) records the procedure, commands, and limits of the shared synthetic templates. Full results are `.private/benchmarks/fez-v1-002/baseline-test.json` and `baseline-summary.json`.
+Per-family correct counts: policy 42/64, routing 44/64, evidence 21/48, severity 39/48. These are the initial reference scores, not a comparison with a newly trained update. The four-example probe was not selected or tuned on this benchmark. [benchmark.md](benchmark.md) records the procedure, commands, and limits of the shared synthetic templates. Full results are `.private/benchmarks/fez-v1-002/baseline-test.json` and `baseline-summary.json`.
 
 ## First trained candidate: fez-candidate-001
 
@@ -138,7 +138,7 @@ Training took 104.28 seconds, including saving but excluding initial model loadi
 
 Both reference and candidate were evaluated at temperature 1.0 on the 112 calibration cases. The same declared macro-family NLL fitting procedure selected temperatures 2.0705298477 and 1.0717734625 respectively. Calibration accuracy was 71/112 (63.39%) for the reference and 93/112 (83.04%) for the candidate. These are development results, not held-out results. The fitter's NLL objective slightly increased the candidate's calibration Brier loss from 0.269228 to 0.269503; no additional fit or recipe change was made in response.
 
-Raw training artifacts: `models/fez-candidate-001`. Calibrated artifacts: `models/fez-reference-calibrated-001` and `models/fez-candidate-001-calibrated`. `calibrate.py` uses Kev's existing fitter; its regression check covers incorrect dataset, checkpoint hash, input temperature, and destination reuse, as well as preservation of weight tensors and answer rankings. The complete seven-test suite passed before the held-out run.
+Raw training artifacts: `models/fez-candidate-001`. Calibrated artifacts: `models/fez-reference-calibrated-001` and `models/fez-candidate-001-calibrated`. `fez.calibrate` uses Kev's existing fitter; its regression check covers incorrect dataset, checkpoint hash, input temperature, and destination reuse, as well as preservation of weight tensors and answer rankings. The complete seven-test suite passed before the held-out run.
 
 Both saved calibrated checkpoints then ran on the unchanged 224-case test set, with the same pinned backbone, validator, MPS device, Torch backend, and FP32 precision. No recipe or temperature was adjusted after this run.
 
@@ -170,7 +170,7 @@ This is evidence of improvement on the small synthetic benchmark with shared tem
 
 ## Three-miner persistent fleet
 
-`fleet.py` packages a separate `start-miner` script and identity for each machine.
+`fez.fleet` packages a separate `start-miner` script and identity for each machine.
 The real rehearsal used those scripts for three independent miners, plus one
 validator, all on this M4 Pro. Connections used the Mac's private LAN interface;
 this verifies the protocol locally, not connectivity to the Mac mini or 4090 PC.

@@ -21,19 +21,10 @@ register the validator/miner hotkeys on the returned subnet ID. Use the live
 chain's registration cost and activation requirements; owning a new subnet
 does not itself make emissions active.
 
-Local preparation on 2026-09-24 created a testnet-only coldkey and four hotkeys
-(`validator`, `mac`, `mini`, `gpu4090`) under `.private/fez-testnet/wallets/`.
-These files are excluded from Git, restricted to the owner, and unencrypted for
-this testnet rehearsal. Back them up securely and do not use them for mainnet.
-Public addresses and wallet references are in `.private/fez-testnet/registration.json`.
-No registration transaction has been sent: the new wallet awaits funding.
-The live subnet creation cost was **1 tTAO**, while the existing accessible
-treasury had only **0.00640175 tTAO** free. Costs can change.
-
 Install the additional SDK on each participant, using the existing environment:
 
 ```bash
-uv pip install --python .venv-kev/bin/python -r requirements-testnet.txt
+uv pip install --python .venv-kev/bin/python -r requirements/testnet.txt
 ```
 
 Use the existing `btcli` wallet files. Each machine needs only its assigned
@@ -64,20 +55,23 @@ entry for each machine:
 
 `777` is an example only; use the subnet ID returned by your registration.
 
+Create or reuse the local benchmark described in the [miner guide](mining.md).
+Replace `VALIDATOR_PRIVATE_IPV4` with the validator's numeric private address.
 Generate a fresh fleet. Match `--miner-ports` to the roster's order and count
 (use `8901 8902 8903` for three miners). The output folder names use chain UIDs.
 The command copies public wallet references into bundles, **never key files**:
 
 ```bash
-.venv-kev/bin/python fleet.py init --out .private/testnet-fleet \
-  --host PRIVATE_IPV4 --miner-ports 8901 \
+.venv-kev/bin/python -m fez.fleet init --out .private/testnet-fleet \
+  --host VALIDATOR_PRIVATE_IPV4 --miner-ports 8901 \
+  --benchmark .private/benchmarks/local \
   --testnet-identities .private/testnet-identities.json
-.venv-kev/bin/python testnet.py preflight \
+.venv-kev/bin/python -m fez.testnet preflight \
   --config .private/testnet-fleet/validator/config.json
 ```
 
 Distribute the assigned `miner-UID.tar.gz` and provision that machine's existing
-hotkey separately. [FLEET.md](FLEET.md) covers the model environment, private
+hotkey separately. [mining.md](mining.md) covers the model environment, private
 networking and startup command. A changed or deregistered UID stops the chain
 path; regenerate the roster with current registrations. Scores are never
 silently reassigned to a replacement hotkey.
@@ -87,7 +81,7 @@ silently reassigned to a replacement hotkey.
 Start each miner with `./start-miner --rounds 1`. On the validator Mac, run:
 
 ```bash
-.venv-kev/bin/python fleet.py validator \
+.venv-kev/bin/python -m fez.fleet validator \
   --config .private/testnet-fleet/validator/config.json --rounds 1
 ```
 
@@ -104,7 +98,7 @@ process should write for its hotkey. The Bazaar validator can keep running on
 Publish the completed round, substituting its directory for `ROUND`:
 
 ```bash
-.venv-kev/bin/python testnet.py publish \
+.venv-kev/bin/python -m fez.testnet publish \
   --config .private/testnet-fleet/validator/config.json \
   --round .private/testnet-fleet/validator/state/rounds/ROUND
 ```
@@ -126,7 +120,7 @@ that marker and retrying can duplicate a submission.
 already use the new weights. Verify after the chain's reveal period:
 
 ```bash
-.venv-kev/bin/python testnet.py verify \
+.venv-kev/bin/python -m fez.testnet verify \
   --config .private/testnet-fleet/validator/config.json \
   --round .private/testnet-fleet/validator/state/rounds/ROUND
 ```
@@ -138,19 +132,7 @@ commit if another process writes for the same hotkey. `rate_limited` and
 `no_weights` send nothing; previous on-chain weights remain. Fez never invents
 uniform rewards when every candidate fails.
 
-## Read-only compatibility check, 2026-09-24
-
-The new preflight read testnet block **8079214** successfully: subnet 553 exists,
-the owner validator is UID 0 with a permit, and the former Bazaar miner hotkeys
-remain registered at UIDs 1–4. Commit-reveal is enabled; the weight cooldown is
-100 blocks. The deployed validator hotkey is under
-`/var/lib/fez/.bittensor/wallets/bazaar/hotkeys/validator` on its server.
-
-**Fez has not replaced that service or published any weights.** The server's
-`default` wallet has a different address from 553's owner. The current Fez
-Keychain treasury matches that `default` wallet, not the old subnet owner.
-Public preflight results are saved locally in `.private/testnet-553/`; this was
-a compatibility check and does not configure the new subnet's ID.
+## Validation
 
 Validation: `python -m unittest discover -v` with model, signing and testnet
 dependencies installed. Chain tests fake external RPC only; wallet signatures,

@@ -13,20 +13,20 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
-import benchmark
+from fez import benchmark
 import fez
 
 
 @unittest.skipUnless(importlib.util.find_spec("bittensor_wallet") and importlib.util.find_spec("kev"), "use .venv-kev")
 class FleetTest(unittest.TestCase):
     def module(self):
-        self.assertIsNotNone(importlib.util.find_spec("fleet"), "persistent miner service is missing")
-        import fleet
+        self.assertIsNotNone(importlib.util.find_spec("fez.fleet"), "persistent miner service is missing")
+        from fez import fleet
         return fleet
 
     def test_pinned_network_and_authenticated_validator(self):
-        f = self.module()
-        import rehearsal as r
+        from fez import runtime
+        from fez import protocol as r
         from bittensor_wallet import Keypair
         key = Keypair.create_from_seed("0x" + "01" * 32)
         claim = {"round_id": "a" * 32, "uid": 1, "hotkey": key.ss58_address,
@@ -42,14 +42,14 @@ class FleetTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 r.endpoint_ok(url, allowed=[url])
         payload = {"kind": "round", "round_id": "a" * 32, "status": "collecting"}
-        message = f.signed(payload, key)
-        self.assertEqual(f.verified(message, key.ss58_address), payload)
+        message = runtime.signed(payload, key)
+        self.assertEqual(runtime.verified(message, key.ss58_address), payload)
         message["payload"]["round_id"] = "b" * 32
         with self.assertRaises(ValueError):
-            f.verified(message, key.ss58_address)
+            runtime.verified(message, key.ss58_address)
         with tempfile.TemporaryDirectory() as tmp:
             destination = Path(tmp) / "state.json"
-            with patch("rehearsal.os.fsync", side_effect=OSError("interrupted write")), self.assertRaises(OSError):
+            with patch("fez.protocol.os.fsync", side_effect=OSError("interrupted write")), self.assertRaises(OSError):
                 r.write_json(destination, {"complete": True})
             self.assertFalse(destination.exists(), "incomplete state must never become visible")
             r.write_json(destination, {"complete": True})
@@ -58,7 +58,9 @@ class FleetTest(unittest.TestCase):
             self.assertEqual(json.loads(destination.read_text()), {"complete": True})
 
     def test_three_miners_complete_two_rounds_and_keep_private_data_local(self):
+        from miner.worker import train_candidate
         f = self.module()
+        from fez import runtime
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             data = root / "benchmark"; benchmark.build(data, seed=553)
@@ -76,7 +78,7 @@ class FleetTest(unittest.TestCase):
             for uid in (1, 2, 3):
                 with tarfile.open(package / f"miner-{uid}.tar.gz") as archive:
                     names = archive.getnames()
-                self.assertFalse(any("calibration" in n or "test.jsonl" in n or "validator" in n for n in names))
+                self.assertFalse(any(Path(n).name in {"calibration.jsonl", "test.jsonl"} or "validator" in Path(n).parts for n in names))
                 self.assertTrue(any(n.endswith("miner-training.jsonl") for n in names))
                 self.assertEqual((package / f"miner-{uid}/config.json").stat().st_mode & 0o777, 0o600)
             validator_path = package / "validator/config.json"
@@ -111,7 +113,7 @@ else:
             try:
                 for role, directory in [("validator", package / "validator"), *[("miner", package / f"miner-{i}") for i in (1, 2, 3)]]:
                     log = (directory / "test.log").open("w"); logs.append(log)
-                    command = [str(directory / "start-miner")] if role == "miner" else [sys.executable, f.__file__, role, "--config", str(directory / "config.json")]
+                    command = [str(directory / "start-miner")] if role == "miner" else [sys.executable, "-m", "fez.fleet", role, "--config", str(directory / "config.json")]
                     processes.append(subprocess.Popen([*command,
                                                        "--runtime-python", str(worker), "--device", "cpu", "--no-download",
                                                        "--rounds", "2", "--poll", ".1"], stdout=log, stderr=subprocess.STDOUT,
@@ -120,17 +122,17 @@ else:
                         deadline = time.monotonic() + 10
                         while True:
                             try:
-                                if f.request(config, "/round").get("kind") == "round": break
+                                if runtime.request(config, "/round").get("kind") == "round": break
                             except URLError:
                                 pass
                             if time.monotonic() > deadline: self.fail("validator did not start")
                             time.sleep(.05)
                         for message in ([], {"claim": []}):
                             with self.assertRaises(HTTPError) as error:
-                                f.request(config, "/submit", message)
+                                runtime.request(config, "/submit", message)
                             self.assertEqual(error.exception.code, 400)
                         with self.assertRaises(HTTPError) as error:
-                            f.request(config, "/submit", {"claim": {"uid": 1, "round_id": "0" * 32}})
+                            runtime.request(config, "/submit", {"claim": {"uid": 1, "round_id": "0" * 32}})
                         self.assertEqual(error.exception.code, 409, "a late miner must be able to retry the next round")
                     elif directory.name == "miner-1":
                         # Restart the actual service after training, while the other miners are still offline.
@@ -166,8 +168,8 @@ else:
                     config = json.loads((miner / "config.json").read_text())
                     job_path = next((miner / "state/jobs").glob("*/job.json"))
                     job = json.loads(job_path.read_text())
-                    first = f.train_candidate(config, miner, job, str(worker), "cpu")
-                    second = f.train_candidate(config, miner, job, str(worker), "cpu")
+                    first = train_candidate(config, miner, job, str(worker), "cpu")
+                    second = train_candidate(config, miner, job, str(worker), "cpu")
                     self.assertEqual(first, second)
                     self.assertEqual(len(benchmark.read_jsonl(miner / "training-calls.jsonl")), 2)
             finally:
