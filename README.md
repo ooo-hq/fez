@@ -4,6 +4,10 @@
 
 <h1 align="center">Fez</h1>
 
+<p align="center">
+  <a href="https://fez.chat/model">fez.chat/model</a>
+</p>
+
 **A small decision model improved through a Bittensor training competition.**
 Fez builds on [Kev](https://github.com/jaredpalmer/kev)'s 0.8B model to return
 probabilities for yes/no decisions, choices, and scores without generating text.
