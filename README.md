@@ -1,3 +1,5 @@
+<img src="subnet.png" alt="Fez mascot wearing a fez" width="120" align="right">
+
 # Fez
 
 **A small decision model improved through a Bittensor training competition.**
@@ -94,14 +96,18 @@ requirements/   Pinned model, signing, and optional testnet dependencies
 
 ## Development
 
+After setup, install the lint tools and SDK used by the testnet tests:
+
 ```bash
-.venv-kev/bin/python -m unittest discover -v
+uv pip install --python .venv-kev/bin/python -r requirements/dev.txt -r requirements/testnet.txt
+make check
 ```
 
 Tests exercise real signatures, HTTP transfers, subprocesses, and restart
 recovery, with fixture model workers and fake chain RPC. They do not train a
-model or send transactions. `python3 -m unittest discover -v` also runs the
-stdlib checks; tests requiring unavailable dependencies are skipped.
+model or send transactions. `make check` requires all test dependencies, runs
+Ruff lint/format checks, and executes the full suite. GitHub Actions runs the same
+checks on pull requests and pushes to `main`. Use `make format` to format Python.
 
 See [local development](docs/development.md) for checkpoint scoring and the
 shorter two-miner rehearsal. Commands use `python -m ...`; old flat script paths

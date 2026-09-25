@@ -1,17 +1,18 @@
 """Fez decision-model subnet: local submissions -> evaluation -> dry-run weights."""
+
 import argparse
-from collections import defaultdict
 import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import re
 import shutil
 import statistics
 import subprocess
 import sys
 import tempfile
+from collections import defaultdict
+from pathlib import Path
 
 from . import ROOT
 
@@ -25,7 +26,9 @@ def options(question):
     kind = question.get("type")
     criteria = question.get("criteria")
     if kind == "noul":
-        if criteria is not None and (not isinstance(criteria, dict) or set(criteria) - {"false", "true"}):
+        if criteria is not None and (
+            not isinstance(criteria, dict) or set(criteria) - {"false", "true"}
+        ):
             raise ValueError("noul criteria must use false/true keys")
         return ["false", "true"]
     if kind == "choice" and isinstance(criteria, dict) and 2 <= len(criteria) <= 255:
@@ -41,7 +44,10 @@ def validate_cases(cases):
         raise ValueError("evaluation cases must be a nonempty list")
     seen = set()
     for case in cases:
-        if not isinstance(case, dict) or not {"id", "family", "state", "question", "label"} <= case.keys():
+        if (
+            not isinstance(case, dict)
+            or not {"id", "family", "state", "question", "label"} <= case.keys()
+        ):
             raise ValueError("case requires id, family, state, question and label")
         for key in ("id", "family", "label"):
             if not isinstance(case[key], str) or not case[key]:
@@ -75,9 +81,11 @@ def score(cases, predictions):
         if not isinstance(probabilities, dict) or set(probabilities) != set(keys):
             raise ValueError("probabilities must cover exactly the available options")
         values = list(probabilities.values())
-        if any(type(p) not in (int, float) or not math.isfinite(p) or not 0 <= p <= 1 for p in values):
+        if any(
+            type(p) not in (int, float) or not math.isfinite(p) or not 0 <= p <= 1 for p in values
+        ):
             raise ValueError("probabilities must be finite numbers in [0, 1]")
-        if not math.isclose(sum(values), 1., abs_tol=1e-6):
+        if not math.isclose(sum(values), 1.0, abs_tol=1e-6):
             raise ValueError("probabilities must sum to one")
         elapsed = row.get("elapsed_ms")
         if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
@@ -87,20 +95,28 @@ def score(cases, predictions):
         # Stable tie break; accuracy is diagnostic, Brier determines skill.
         chosen = max(sorted(keys), key=probabilities.get)
         correct += chosen == case["label"]
-        confident_errors += chosen != case["label"] and probabilities[chosen] >= .9
+        confident_errors += chosen != case["label"] and probabilities[chosen] >= 0.9
         latency.append(elapsed)
     brier = statistics.mean(statistics.mean(loss for loss, _ in rows) for rows in families.values())
-    baseline = statistics.mean(statistics.mean(base for _, base in rows) for rows in families.values())
-    return {"brier": brier, "uniform_brier": baseline, "skill": max(0., 1 - brier / baseline),
-            "accuracy": correct / len(cases), "confident_errors": confident_errors,
-            "median_ms": statistics.median(latency),
-            "p95_ms": sorted(latency)[math.ceil(.95 * len(latency)) - 1], "cases": len(cases)}
+    baseline = statistics.mean(
+        statistics.mean(base for _, base in rows) for rows in families.values()
+    )
+    return {
+        "brier": brier,
+        "uniform_brier": baseline,
+        "skill": max(0.0, 1 - brier / baseline),
+        "accuracy": correct / len(cases),
+        "confident_errors": confident_errors,
+        "median_ms": statistics.median(latency),
+        "p95_ms": sorted(latency)[math.ceil(0.95 * len(latency)) - 1],
+        "cases": len(cases),
+    }
 
 
 def weight_vector(rows):
     skills = {}
     for row in rows:
-        uid, skill = row["uid"], row.get("skill", 0.)
+        uid, skill = row["uid"], row.get("skill", 0.0)
         if type(uid) is not int or not 0 <= uid <= 65535 or uid in skills:
             raise ValueError("uids must be unique integers in [0, 65535]")
         if type(skill) not in (int, float) or not math.isfinite(skill) or not 0 <= skill <= 1:
@@ -146,9 +162,14 @@ def validate_submissions(entries):
         if not isinstance(entry["checkpoint"], str) or not Path(entry["checkpoint"]).is_absolute():
             raise ValueError("checkpoint must be an absolute local path")
         digest = entry["sha256"]
-        if not isinstance(digest, str) or not re.fullmatch("[a-f0-9]{64}", digest) or digest in hashes:
+        if (
+            not isinstance(digest, str)
+            or not re.fullmatch("[a-f0-9]{64}", digest)
+            or digest in hashes
+        ):
             raise ValueError("duplicate or invalid checkpoint hash")
-        uids.add(uid); hashes.add(digest)
+        uids.add(uid)
+        hashes.add(digest)
 
 
 def stage(entry, destination):
@@ -176,47 +197,92 @@ def evaluate(args):
     if Path(args.report).exists():
         raise ValueError("report already exists; choose a new round filename")
     # The inference process never receives labels or task-family weights.
-    requests = [{"id": case["id"], "state": case["state"], "question": case["question"]} for case in cases]
+    requests = [
+        {"id": case["id"], "state": case["state"], "question": case["question"]} for case in cases
+    ]
     runner = Path(__file__).with_name("kev_runner.py")
-    environment = {**os.environ, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-                   "TORCH_FORCE_WEIGHTS_ONLY_LOAD": "1", "HF_HUB_DISABLE_TELEMETRY": "1",
-                   "HF_HOME": os.environ.get("HF_HOME", str(ROOT / ".cache/huggingface"))}
+    environment = {
+        **os.environ,
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_FORCE_WEIGHTS_ONLY_LOAD": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "HF_HOME": os.environ.get("HF_HOME", str(ROOT / ".cache/huggingface")),
+    }
     rows = []
     for entry in entries:
         row = {"uid": entry["uid"], "sha256": entry["sha256"]}
-        print(f"Evaluating miner {entry['uid']} on {len(cases)} cases ({args.device})", file=sys.stderr, flush=True)
+        print(
+            f"Evaluating miner {entry['uid']} on {len(cases)} cases ({args.device})",
+            file=sys.stderr,
+            flush=True,
+        )
         try:
             with tempfile.TemporaryDirectory(prefix="fez-eval-") as tmp:
                 checkpoint = Path(tmp) / "checkpoint"
                 stage(entry, checkpoint)
                 try:
                     result = subprocess.run(
-                        [args.runner_python, str(runner), "--checkpoint", str(checkpoint),
-                         "--base", BASE, "--base-revision", args.base_revision, "--device", args.device],
-                        input=json.dumps(requests, allow_nan=False), text=True, capture_output=True,
-                        timeout=args.timeout, env=environment,
+                        [
+                            args.runner_python,
+                            str(runner),
+                            "--checkpoint",
+                            str(checkpoint),
+                            "--base",
+                            BASE,
+                            "--base-revision",
+                            args.base_revision,
+                            "--device",
+                            args.device,
+                        ],
+                        input=json.dumps(requests, allow_nan=False),
+                        text=True,
+                        capture_output=True,
+                        timeout=args.timeout,
+                        env=environment,
                     )
                 except OSError as error:
                     raise RuntimeError(f"cannot start evaluation runtime: {error}") from error
                 if result.returncode == 78:
-                    raise RuntimeError(f"evaluation environment unavailable: {result.stderr[-1000:]}")
+                    raise RuntimeError(
+                        f"evaluation environment unavailable: {result.stderr[-1000:]}"
+                    )
                 if result.returncode:
                     raise ValueError(f"model runner failed: {result.stderr[-1000:]}")
                 output = json.loads(result.stdout)
                 row.update(score(cases, output["predictions"]))
-                row.update(status="evaluated", runtime=output["runtime"], predictions=output["predictions"])
+                row.update(
+                    status="evaluated", runtime=output["runtime"], predictions=output["predictions"]
+                )
         except (ValueError, OSError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
-            row.update(status="rejected", skill=0., error=str(error)[:1200])
+            row.update(status="rejected", skill=0.0, error=str(error)[:1200])
         rows.append(row)
-    report = {"mode": "local-dry-run", "rubric": RUBRIC, "base": BASE,
-              "base_revision": args.base_revision, "device": args.device, "timeout_s": args.timeout,
-              "dataset_sha256": hashlib.sha256(json.dumps(cases, sort_keys=True, allow_nan=False).encode()).hexdigest(),
-              "miners": rows, "weights": weight_vector(rows)}
+    report = {
+        "mode": "local-dry-run",
+        "rubric": RUBRIC,
+        "base": BASE,
+        "base_revision": args.base_revision,
+        "device": args.device,
+        "timeout_s": args.timeout,
+        "dataset_sha256": hashlib.sha256(
+            json.dumps(cases, sort_keys=True, allow_nan=False).encode()
+        ).hexdigest(),
+        "miners": rows,
+        "weights": weight_vector(rows),
+    }
     # Exclusive creation protects an earlier round from accidental overwrite.
     with Path(args.report).open("x") as output:
         json.dump(report, output, indent=2, allow_nan=False)
         output.write("\n")
-    print(json.dumps({"report": str(Path(args.report).resolve()), "mode": report["mode"], "weights": report["weights"]}))
+    print(
+        json.dumps(
+            {
+                "report": str(Path(args.report).resolve()),
+                "mode": report["mode"],
+                "weights": report["weights"],
+            }
+        )
+    )
 
 
 def main():
@@ -225,7 +291,9 @@ def main():
     submit = commands.add_parser("submit", help="print a local submission; redirect to a JSON file")
     submit.add_argument("--checkpoint", required=True)
     submit.add_argument("--uid", type=int, required=True)
-    run = commands.add_parser("evaluate", help="evaluate local checkpoints; never submits chain weights")
+    run = commands.add_parser(
+        "evaluate", help="evaluate local checkpoints; never submits chain weights"
+    )
     run.add_argument("--submissions", required=True)
     run.add_argument("--cases", required=True)
     run.add_argument("--base-revision", required=True)

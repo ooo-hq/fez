@@ -1,19 +1,23 @@
 """Checks for wrong oracle boundaries, leaked splits, and mismatched evaluation reports."""
+
 import copy
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 import fez
 
 
 class BenchmarkTest(unittest.TestCase):
     def module(self):
-        self.assertIsNotNone(importlib.util.find_spec("fez.benchmark"), "benchmark builder is missing")
+        self.assertIsNotNone(
+            importlib.util.find_spec("fez.benchmark"), "benchmark builder is missing"
+        )
         from fez import benchmark
+
         return benchmark
 
     def test_rule_boundaries_have_independent_answers(self):
@@ -28,7 +32,10 @@ class BenchmarkTest(unittest.TestCase):
             ((None, 10, True, False, False), "false"),
         ]:
             self.assertEqual(b.policy_answer(*values), expected)
-        self.assertEqual(b.routing_answer(["delivery", "billing"], ["security", "billing", "delivery"]), "billing")
+        self.assertEqual(
+            b.routing_answer(["delivery", "billing"], ["security", "billing", "delivery"]),
+            "billing",
+        )
         for facts, value, negated, expected in [
             ({"color": "blue"}, "blue", False, "supported"),
             ({"color": "blue"}, "red", False, "contradicted"),
@@ -38,8 +45,13 @@ class BenchmarkTest(unittest.TestCase):
             ({}, "red", True, "unknown"),
         ]:
             self.assertEqual(b.evidence_answer(facts, "color", value, negated), expected)
-        for value, override, expected in [(9, False, "0"), (10, False, "1"),
-                                           (19, False, "1"), (20, False, "2"), (0, True, "2")]:
+        for value, override, expected in [
+            (9, False, "0"),
+            (10, False, "1"),
+            (19, False, "1"),
+            (20, False, "2"),
+            (0, True, "2"),
+        ]:
             self.assertEqual(b.severity_answer(value, 10, 20, override), expected)
 
     def test_frozen_splits_reject_leaks_and_changes(self):
@@ -48,12 +60,17 @@ class BenchmarkTest(unittest.TestCase):
             root = Path(tmp) / "benchmark"
             b.build(root, seed=553)
             splits = b.audit(root)
-            self.assertEqual({k: len(v) for k, v in splits.items()}, {"train": 224, "calibration": 112, "test": 224})
+            self.assertEqual(
+                {k: len(v) for k, v in splits.items()},
+                {"train": 224, "calibration": 112, "test": 224},
+            )
             self.assertEqual(len({c["group_id"] for c in splits["test"]}), 112)
             self.assertEqual(len({c["scenario_id"] for c in splits["test"]}), 16)
             for family in ("policy", "routing", "evidence", "severity"):
                 rows = [c for c in splits["test"] if c["family"] == family]
-                self.assertEqual(set(c["label"] for c in rows), set(fez.options(rows[0]["question"])))
+                self.assertEqual(
+                    set(c["label"] for c in rows), set(fez.options(rows[0]["question"]))
+                )
             training = b.read_jsonl(root / "miner-training.jsonl")
             self.assertEqual(len(training), 224)
             self.assertTrue(all(set(row) == {"state", "questions"} for row in training))
@@ -61,7 +78,11 @@ class BenchmarkTest(unittest.TestCase):
             for row in training:
                 question = row["questions"]["decision"]
                 expected_type = {"noul": bool, "choice": str, "score": int}[question["type"]]
-                self.assertIs(type(question["label"]), expected_type, "training labels must use Kev's native types")
+                self.assertIs(
+                    type(question["label"]),
+                    expected_type,
+                    "training labels must use Kev's native types",
+                )
             self.assertEqual(root.stat().st_mode & 0o777, 0o700)
             self.assertEqual((root / "test.jsonl").stat().st_mode & 0o777, 0o600)
             with self.assertRaises(FileExistsError):
@@ -94,11 +115,29 @@ class BenchmarkTest(unittest.TestCase):
             root = Path(tmp) / "benchmark"
             b.build(root, seed=2)
             cases = b.audit(root)["test"]
-            predictions = [{"id": c["id"], "elapsed_ms": 10,
-                            "probabilities": {k: float(k == c["label"]) for k in fez.options(c["question"])}}
-                           for c in cases]
-            report = {"dataset_sha256": hashlib.sha256(json.dumps(cases, sort_keys=True, allow_nan=False).encode()).hexdigest(),
-                      "miners": [{"uid": 1, "status": "evaluated", "predictions": predictions, "runtime": {"fixture": True}}]}
+            predictions = [
+                {
+                    "id": c["id"],
+                    "elapsed_ms": 10,
+                    "probabilities": {
+                        k: float(k == c["label"]) for k in fez.options(c["question"])
+                    },
+                }
+                for c in cases
+            ]
+            report = {
+                "dataset_sha256": hashlib.sha256(
+                    json.dumps(cases, sort_keys=True, allow_nan=False).encode()
+                ).hexdigest(),
+                "miners": [
+                    {
+                        "uid": 1,
+                        "status": "evaluated",
+                        "predictions": predictions,
+                        "runtime": {"fixture": True},
+                    }
+                ],
+            }
             summary = b.summarize(root, report, "test")
             row = summary["miners"][0]
             self.assertEqual(row["overall"]["skill"], 1)
@@ -109,7 +148,9 @@ class BenchmarkTest(unittest.TestCase):
             stress = next(c for c in cases if c["variant"] != "clean")
             prediction = next(p for p in predictions if p["id"] == stress["id"])
             wrong = next(k for k in prediction["probabilities"] if k != stress["label"])
-            prediction["probabilities"] = {k: float(k == wrong) for k in prediction["probabilities"]}
+            prediction["probabilities"] = {
+                k: float(k == wrong) for k in prediction["probabilities"]
+            }
             changed = b.summarize(root, report, "test")["miners"][0]
             self.assertAlmostEqual(changed["pair_agreement"], 111 / 112)
             self.assertAlmostEqual(changed["both_variants_correct"], 111 / 112)

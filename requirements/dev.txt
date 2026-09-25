@@ -1,0 +1,2 @@
+# Lint and formatting tools; runtime and test dependencies are installed separately.
+ruff==0.16.9

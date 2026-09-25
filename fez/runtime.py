@@ -1,26 +1,31 @@
 """Process isolation, signing, and the pinned model cache shared by services."""
-from contextlib import contextmanager
+
 import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import signal
 import subprocess
 import tempfile
+from contextlib import contextmanager
+from pathlib import Path
 from urllib.request import Request
 
 from bittensor_wallet import Keypair
+
 import fez
+
 from . import ROOT, protocol as wire
 
 LIMIT = 64 * 1024
 
 
-
 def canonical(payload):
-    return b"fez-fleet/v1\0" + json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    return (
+        b"fez-fleet/v1\0"
+        + json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    )
 
 
 def signed(payload, key):
@@ -30,10 +35,13 @@ def signed(payload, key):
 def verified(message, hotkey):
     if not isinstance(message, dict) or set(message) != {"payload", "signature"}:
         raise ValueError("invalid signed message")
-    if not isinstance(message["signature"], str) or not re.fullmatch("[a-f0-9]{128}", message["signature"]):
+    if not isinstance(message["signature"], str) or not re.fullmatch(
+        "[a-f0-9]{128}", message["signature"]
+    ):
         raise ValueError("invalid message signature")
     if not isinstance(message["payload"], dict) or not Keypair(ss58_address=hotkey).verify(
-            canonical(message["payload"]), bytes.fromhex(message["signature"])):
+        canonical(message["payload"]), bytes.fromhex(message["signature"])
+    ):
         raise ValueError("validator or miner signature failed")
     return message["payload"]
 
@@ -55,15 +63,27 @@ def locked(path, wait=False):
 
 
 def run_child(command, log, device, timeout=3600):
-    environment = {**os.environ, "HF_HOME": os.environ.get("HF_HOME", str(ROOT / ".cache/huggingface")), "HF_HUB_OFFLINE": "1",
-                   "TRANSFORMERS_OFFLINE": "1", "TORCH_FORCE_WEIGHTS_ONLY_LOAD": "1",
-                   "HF_HUB_DISABLE_TELEMETRY": "1", "PYTORCH_ENABLE_MPS_FALLBACK": "1",
-                   "PYTHONPATH": str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    environment = {
+        **os.environ,
+        "HF_HOME": os.environ.get("HF_HOME", str(ROOT / ".cache/huggingface")),
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_FORCE_WEIGHTS_ONLY_LOAD": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+        "PYTHONPATH": str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", ""),
+    }
     # ponytail: one GPU job per user/device; add device-index locks only when multi-GPU hosts exist.
     lock = Path(tempfile.gettempdir()) / f"fez-compute-{os.getuid()}-{device}.lock"
     with locked(lock, wait=True), Path(log).open("ab") as output:
-        process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT, env=environment,
-                                   start_new_session=True, cwd=ROOT)
+        process = subprocess.Popen(
+            command,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            env=environment,
+            start_new_session=True,
+            cwd=ROOT,
+        )
         try:
             if process.wait(timeout=timeout):
                 raise RuntimeError(f"worker failed; inspect {log}")
@@ -75,12 +95,14 @@ def run_child(command, log, device, timeout=3600):
             try:
                 process.wait(timeout=6)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL); process.wait(timeout=6)
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=6)
 
 
 def signing_key(config):
     if "wallet" in config:
         from bittensor.wallet import Wallet
+
         key = Wallet(**config["wallet"]).hotkey
         if key.ss58_address != config.get("hotkey", config["validator_hotkey"]):
             raise ValueError("wallet hotkey does not match the configured identity")
@@ -103,9 +125,14 @@ def request(config, path, message=None):
 def prepare_base():
     from huggingface_hub import snapshot_download
     from huggingface_hub.errors import LocalEntryNotFoundError
+
     cache = Path(os.environ.get("HF_HOME", str(ROOT / ".cache/huggingface"))) / "hub"
-    options = {"repo_id": fez.BASE, "revision": wire.BASE_REVISION, "cache_dir": str(cache),
-               "allow_patterns": ["*.json", "*.safetensors", "*.txt", "*.jinja"]}
+    options = {
+        "repo_id": fez.BASE,
+        "revision": wire.BASE_REVISION,
+        "cache_dir": str(cache),
+        "allow_patterns": ["*.json", "*.safetensors", "*.txt", "*.jinja"],
+    }
     try:
         snapshot_download(**options, local_files_only=True)
     except LocalEntryNotFoundError:

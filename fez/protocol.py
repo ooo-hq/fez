@@ -1,38 +1,52 @@
 """Signed checkpoint announcements, private-LAN transport, and atomic state."""
-from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, HTTPServer
+
 import ipaddress
 import json
 import os
-from pathlib import Path
 import re
 import threading
 import time
-from urllib.request import build_opener, HTTPRedirectHandler, ProxyHandler
 import uuid
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 from bittensor_wallet import Keypair
+
 import fez
 
 BASE_REVISION = "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68"
 MAX_ANNOUNCEMENT = 8192
 
 
-
 def canonical(claim):
-    return b"fez-local-checkpoint/v1\0" + json.dumps(claim, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    return (
+        b"fez-local-checkpoint/v1\0"
+        + json.dumps(claim, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    )
 
 
 def endpoint_ok(endpoint, allowed=None):
-    match = re.fullmatch(r"http://([0-9.]+):([1-9][0-9]{0,4})", endpoint) if isinstance(endpoint, str) else None
+    match = (
+        re.fullmatch(r"http://([0-9.]+):([1-9][0-9]{0,4})", endpoint)
+        if isinstance(endpoint, str)
+        else None
+    )
     if not match or int(match[2]) > 65535:
         raise ValueError("endpoint must be http://<numeric-IPv4>:<port>")
     address = ipaddress.IPv4Address(match[1])
     if allowed is None:
         if str(address) != "127.0.0.1":
             raise ValueError("remote endpoints require an explicit pin")
-    elif (endpoint not in allowed or not (address.is_private or address.is_loopback)
-          or address.is_link_local or address.is_unspecified or address.is_multicast or address.is_reserved):
+    elif (
+        endpoint not in allowed
+        or not (address.is_private or address.is_loopback)
+        or address.is_link_local
+        or address.is_unspecified
+        or address.is_multicast
+        or address.is_reserved
+    ):
         raise ValueError("endpoint must match a pinned private IPv4 address")
 
 
@@ -56,7 +70,10 @@ def register(message, round_id, members, registry, endpoints=None):
         raise ValueError("signature verification failed")
     if uid in registry and registry[uid]["claim"] != c:
         raise ValueError("a miner cannot change its submission within a round")
-    if any(other != uid and entry["claim"]["sha256"] == c["sha256"] for other, entry in registry.items()):
+    if any(
+        other != uid and entry["claim"]["sha256"] == c["sha256"]
+        for other, entry in registry.items()
+    ):
         raise ValueError("duplicate checkpoint from another miner")
     registry[uid] = {"claim": dict(c), "signature": signature}
     return c
@@ -69,7 +86,9 @@ def write_json(path, data):
     fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "w") as output:
-            output.write(payload); output.flush(); os.fsync(output.fileno())
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
         # Publish complete state atomically; link refuses to overwrite an earlier round.
         os.link(temporary, path)
     finally:
@@ -89,18 +108,22 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.end_headers(); self.wfile.write(body)
+        self.end_headers()
+        self.wfile.write(body)
 
 
 @contextmanager
 def local_server(handler, host="127.0.0.1", port=0):
     with HTTPServer((host, port), handler) as server:
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .1}, daemon=True)
+        thread = threading.Thread(
+            target=server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True
+        )
         thread.start()
         try:
             yield f"http://{host}:{server.server_port}"
         finally:
-            server.shutdown(); thread.join(timeout=6)
+            server.shutdown()
+            thread.join(timeout=6)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -113,11 +136,14 @@ def opener():
 
 
 def fetch_checkpoint(claim, destination, expected_endpoint=None, round_scoped=False):
-    endpoint_ok(claim["endpoint"], allowed=[expected_endpoint] if expected_endpoint is not None else None)
+    endpoint_ok(
+        claim["endpoint"], allowed=[expected_endpoint] if expected_endpoint is not None else None
+    )
     if round_scoped and not re.fullmatch("[a-f0-9]{32}", claim["round_id"]):
         raise ValueError("invalid artifact round id")
     prefix = "/artifacts/" + (claim["round_id"] + "/" if round_scoped else "")
-    destination = Path(destination); destination.mkdir()
+    destination = Path(destination)
+    destination.mkdir()
     started, total = time.monotonic(), 0
     for name in fez.ARTIFACT_FILES:
         with opener().open(claim["endpoint"] + prefix + name, timeout=5) as response:

@@ -1,21 +1,52 @@
 # Local development
 
-Run commands from the repository root after the [installation steps](../README.md#setup).
-Those steps create `.venv-kev`, download `models/reference`, and cache the pinned
-base model. Python 3.13 is required; native Windows users should use WSL 2.
+Run commands from the repository root. Use Python 3.13 and Make on macOS, Linux,
+or WSL 2. Linting and tests need no model weights, GPU, wallet, or chain access.
 
-## Run the tests
+## Install development dependencies
+
+Create `.venv-kev` if it does not exist, using `uv venv --python 3.13 .venv-kev`.
+Install the pinned tools and dependencies, including the optional SDK used by
+the testnet tests:
 
 ```bash
-.venv-kev/bin/python -m unittest discover -v
+uv pip install --python .venv-kev/bin/python \
+  -r requirements/dev.txt -r requirements/model.txt \
+  -r requirements/rehearsal.txt -r requirements/testnet.txt
+make check
 ```
+
+`make check` runs Ruff linting, a formatting check, and the full Python suite.
+When `website/package.json` is present, it also runs the website checks; install
+Node.js 22+ and npm for that part.
+Its dependency preflight fails if an optional runtime is missing, so integration
+tests cannot silently skip because the SDK or model library was not installed.
+Use `make lint` for the fast checks, `make format` to sort imports and format
+Python, and `make test` for the suite. Override `PYTHON` to use another environment,
+for example `make check PYTHON=python` in an activated virtual environment.
 
 The process tests run real HTTP, signatures, checkpoint transfer, calibration,
 and restart handling. Training and inference use fixture workers; chain RPC is
 faked. Tests need no GPU and never submit transactions. Passing them does not
 establish model quality or GPU performance.
 
+## Continuous integration
+
+[GitHub Actions](https://github.com/ooo-hq/fez/actions/workflows/checks.yml) runs
+lint/format checks and the full Python suite on pull requests and pushes to
+`main`. CI installs CPU PyTorch and runs model workers offline. When website
+source is present, a separate job checks JavaScript syntax, runs its tests, and
+builds the static site. Run the same website checks locally with
+`make check-website` using Node.js 22+ and npm.
+
+The workflow uses read-only repository permissions and pinned Action revisions.
+Repository branch-protection settings determine whether these checks are required
+before merging; the workflow itself does not change those settings.
+
 ## Score the reference checkpoint
+
+Complete the [model installation steps](../README.md#setup) to download
+`models/reference` and cache the pinned base model before these examples.
 
 ```bash
 .venv-kev/bin/python -m fez submit \

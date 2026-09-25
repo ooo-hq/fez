@@ -6,6 +6,7 @@ round*.json
 .cache/
 .python/
 .deps/
+.ruff_cache/
 runs/
 .private/
 .DS_Store

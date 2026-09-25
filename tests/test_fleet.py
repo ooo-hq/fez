@@ -1,8 +1,8 @@
 """Three real miner services and a validator; only expensive ML work uses a fixture executable."""
+
 import importlib.util
 import json
 import os
-from pathlib import Path
 import socket
 import subprocess
 import sys
@@ -10,35 +10,63 @@ import tarfile
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
-from fez import benchmark
 import fez
+from fez import benchmark
 
 
-@unittest.skipUnless(importlib.util.find_spec("bittensor_wallet") and importlib.util.find_spec("kev"), "use .venv-kev")
+@unittest.skipUnless(
+    importlib.util.find_spec("bittensor_wallet") and importlib.util.find_spec("kev"),
+    "use .venv-kev",
+)
 class FleetTest(unittest.TestCase):
     def module(self):
-        self.assertIsNotNone(importlib.util.find_spec("fez.fleet"), "persistent miner service is missing")
+        self.assertIsNotNone(
+            importlib.util.find_spec("fez.fleet"), "persistent miner service is missing"
+        )
         from fez import fleet
+
         return fleet
 
     def test_pinned_network_and_authenticated_validator(self):
-        from fez import runtime
-        from fez import protocol as r
         from bittensor_wallet import Keypair
+
+        from fez import protocol as r, runtime
+
         key = Keypair.create_from_seed("0x" + "01" * 32)
-        claim = {"round_id": "a" * 32, "uid": 1, "hotkey": key.ss58_address,
-                 "sha256": "b" * 64, "endpoint": "http://192.168.1.20:8901"}
+        claim = {
+            "round_id": "a" * 32,
+            "uid": 1,
+            "hotkey": key.ss58_address,
+            "sha256": "b" * 64,
+            "endpoint": "http://192.168.1.20:8901",
+        }
         signed = {"claim": claim, "signature": key.sign(r.canonical(claim)).hex()}
         with self.assertRaises(ValueError):
             r.register(signed, "a" * 32, {1: key.ss58_address}, {})
-        self.assertEqual(r.register(signed, "a" * 32, {1: key.ss58_address}, {},
-                                    endpoints={1: claim["endpoint"]}), claim)
+        self.assertEqual(
+            r.register(
+                signed, "a" * 32, {1: key.ss58_address}, {}, endpoints={1: claim["endpoint"]}
+            ),
+            claim,
+        )
         with self.assertRaises(ValueError):
-            r.register(signed, "a" * 32, {1: key.ss58_address}, {}, endpoints={1: "http://192.168.1.21:8901"})
-        for url in ("http://169.254.169.254:80", "http://8.8.8.8:80", "http://0.0.0.0:80", "http://example.com:80"):
+            r.register(
+                signed,
+                "a" * 32,
+                {1: key.ss58_address},
+                {},
+                endpoints={1: "http://192.168.1.21:8901"},
+            )
+        for url in (
+            "http://169.254.169.254:80",
+            "http://8.8.8.8:80",
+            "http://0.0.0.0:80",
+            "http://example.com:80",
+        ):
             with self.assertRaises(ValueError):
                 r.endpoint_ok(url, allowed=[url])
         payload = {"kind": "round", "round_id": "a" * 32, "status": "collecting"}
@@ -49,7 +77,10 @@ class FleetTest(unittest.TestCase):
             runtime.verified(message, key.ss58_address)
         with tempfile.TemporaryDirectory() as tmp:
             destination = Path(tmp) / "state.json"
-            with patch("fez.protocol.os.fsync", side_effect=OSError("interrupted write")), self.assertRaises(OSError):
+            with (
+                patch("fez.protocol.os.fsync", side_effect=OSError("interrupted write")),
+                self.assertRaises(OSError),
+            ):
                 r.write_json(destination, {"complete": True})
             self.assertFalse(destination.exists(), "incomplete state must never become visible")
             r.write_json(destination, {"complete": True})
@@ -59,17 +90,23 @@ class FleetTest(unittest.TestCase):
 
     def test_three_miners_complete_two_rounds_and_keep_private_data_local(self):
         from miner.worker import train_candidate
+
         f = self.module()
         from fez import runtime
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            data = root / "benchmark"; benchmark.build(data, seed=553)
-            source = root / "source"; source.mkdir()
+            data = root / "benchmark"
+            benchmark.build(data, seed=553)
+            source = root / "source"
+            source.mkdir()
             for name in fez.ARTIFACT_FILES:
                 (source / name).write_bytes(b"initial fixture")
             sockets = []
             for _ in range(4):
-                sock = socket.socket(); sock.bind(("127.0.0.1", 0)); sockets.append(sock)
+                sock = socket.socket()
+                sock.bind(("127.0.0.1", 0))
+                sockets.append(sock)
             ports = [s.getsockname()[1] for s in sockets]
             for sock in sockets:
                 sock.close()
@@ -78,15 +115,25 @@ class FleetTest(unittest.TestCase):
             for uid in (1, 2, 3):
                 with tarfile.open(package / f"miner-{uid}.tar.gz") as archive:
                     names = archive.getnames()
-                self.assertFalse(any(Path(n).name in {"calibration.jsonl", "test.jsonl"} or "validator" in Path(n).parts for n in names))
+                self.assertFalse(
+                    any(
+                        Path(n).name in {"calibration.jsonl", "test.jsonl"}
+                        or "validator" in Path(n).parts
+                        for n in names
+                    )
+                )
                 self.assertTrue(any(n.endswith("miner-training.jsonl") for n in names))
-                self.assertEqual((package / f"miner-{uid}/config.json").stat().st_mode & 0o777, 0o600)
+                self.assertEqual(
+                    (package / f"miner-{uid}/config.json").stat().st_mode & 0o777, 0o600
+                )
             validator_path = package / "validator/config.json"
             config = json.loads(validator_path.read_text())
-            config.update(round_timeout=45, round_pause=.1, result_grace=8)
+            config.update(round_timeout=45, round_pause=0.1, result_grace=8)
             validator_path.write_text(json.dumps(config))
             worker = root / "fixture-python"
-            worker.write_text(f"#!{sys.executable}\n" + '''import json, sys
+            worker.write_text(
+                f"#!{sys.executable}\n"
+                + """import json, sys
 from pathlib import Path
 import torch
 from kev.checkpoint import Meta, read_meta, write_meta
@@ -107,45 +154,89 @@ else:
     import fez
     predictions=[{'id':row['id'],'elapsed_ms':1,'probabilities':dict.fromkeys(fez.options(row['question']),1/len(fez.options(row['question'])))} for row in requests]
     print(json.dumps({'predictions':predictions,'runtime':{'fixture':True,'temperature':meta.temperature}}))
-''')
+"""
+            )
             worker.chmod(0o700)
             processes, logs = [], []
             try:
-                for role, directory in [("validator", package / "validator"), *[("miner", package / f"miner-{i}") for i in (1, 2, 3)]]:
-                    log = (directory / "test.log").open("w"); logs.append(log)
-                    command = [str(directory / "start-miner")] if role == "miner" else [sys.executable, "-m", "fez.fleet", role, "--config", str(directory / "config.json")]
-                    processes.append(subprocess.Popen([*command,
-                                                       "--runtime-python", str(worker), "--device", "cpu", "--no-download",
-                                                       "--rounds", "2", "--poll", ".1"], stdout=log, stderr=subprocess.STDOUT,
-                                                       env={**os.environ, "FEZ_PYTHON": sys.executable}))
+                for role, directory in [
+                    ("validator", package / "validator"),
+                    *[("miner", package / f"miner-{i}") for i in (1, 2, 3)],
+                ]:
+                    log = (directory / "test.log").open("w")
+                    logs.append(log)
+                    command = (
+                        [str(directory / "start-miner")]
+                        if role == "miner"
+                        else [
+                            sys.executable,
+                            "-m",
+                            "fez.fleet",
+                            role,
+                            "--config",
+                            str(directory / "config.json"),
+                        ]
+                    )
+                    processes.append(
+                        subprocess.Popen(
+                            [
+                                *command,
+                                "--runtime-python",
+                                str(worker),
+                                "--device",
+                                "cpu",
+                                "--no-download",
+                                "--rounds",
+                                "2",
+                                "--poll",
+                                ".1",
+                            ],
+                            stdout=log,
+                            stderr=subprocess.STDOUT,
+                            env={**os.environ, "FEZ_PYTHON": sys.executable},
+                        )
+                    )
                     if role == "validator":
                         deadline = time.monotonic() + 10
                         while True:
                             try:
-                                if runtime.request(config, "/round").get("kind") == "round": break
+                                if runtime.request(config, "/round").get("kind") == "round":
+                                    break
                             except URLError:
                                 pass
-                            if time.monotonic() > deadline: self.fail("validator did not start")
-                            time.sleep(.05)
+                            if time.monotonic() > deadline:
+                                self.fail("validator did not start")
+                            time.sleep(0.05)
                         for message in ([], {"claim": []}):
                             with self.assertRaises(HTTPError) as error:
                                 runtime.request(config, "/submit", message)
                             self.assertEqual(error.exception.code, 400)
                         with self.assertRaises(HTTPError) as error:
-                            runtime.request(config, "/submit", {"claim": {"uid": 1, "round_id": "0" * 32}})
-                        self.assertEqual(error.exception.code, 409, "a late miner must be able to retry the next round")
+                            runtime.request(
+                                config, "/submit", {"claim": {"uid": 1, "round_id": "0" * 32}}
+                            )
+                        self.assertEqual(
+                            error.exception.code,
+                            409,
+                            "a late miner must be able to retry the next round",
+                        )
                     elif directory.name == "miner-1":
                         # Restart the actual service after training, while the other miners are still offline.
                         deadline = time.monotonic() + 30
                         while not list((directory / "state/jobs").glob("*/candidate.json")):
                             if time.monotonic() > deadline or processes[-1].poll() is not None:
                                 self.fail("miner did not train: " + Path(log.name).read_text())
-                            time.sleep(.1)
+                            time.sleep(0.1)
                         previous = processes[-1]
-                        previous.terminate(); previous.wait(timeout=8)
+                        previous.terminate()
+                        previous.wait(timeout=8)
                         self.assertEqual(previous.returncode, 0)
-                        processes[-1] = subprocess.Popen(previous.args, stdout=log, stderr=subprocess.STDOUT,
-                                                         env={**os.environ, "FEZ_PYTHON": sys.executable})
+                        processes[-1] = subprocess.Popen(
+                            previous.args,
+                            stdout=log,
+                            stderr=subprocess.STDOUT,
+                            env={**os.environ, "FEZ_PYTHON": sys.executable},
+                        )
                 for process in processes:
                     process.wait(timeout=100)
                 for process, log in zip(processes, logs):
@@ -180,7 +271,8 @@ else:
                     try:
                         process.wait(timeout=8)
                     except subprocess.TimeoutExpired:
-                        process.kill(); process.wait()
+                        process.kill()
+                        process.wait()
                 for log in logs:
                     log.close()
 
