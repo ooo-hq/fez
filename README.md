@@ -40,6 +40,27 @@ miner-reported scores. See the [evaluation contract](docs/evaluation.md).
 
 ## Setup
 
+### Fine-tune on your own data
+
+Install the [Fez fine-tuning skill](skills/fez-finetune/SKILL.md) into your coding
+agent:
+
+```bash
+npx skills add ooo-hq/fez@fez-finetune
+```
+
+Then ask: “Fine-tune a Fez candidate on my labelled support tickets using Kev-4B.”
+The skill supports Kev 0.8B, 4B, and 9B starting checkpoints, data preparation,
+calibration, baseline comparisons, and optional serving. It reuses pinned Kev
+tools; cloud training requires a Modal account and an agreed compute budget.
+Installing the skill starts no training and needs no GPU.
+
+Outputs are experimental Fez candidates. Published Fez weights are not yet
+available, and the current subnet accepts only its pinned 0.8B architecture;
+4B/9B own-data experiments do not change that contract.
+
+### Repository setup
+
 The public dashboard is intended for `fez.chat/model` in the existing Fez website.
 For a standalone local preview, see [`website/`](website/README.md). With
 Node.js 22+ and Python 3 installed, run `npm --prefix website run preview` and
@@ -101,6 +122,7 @@ miner/           Training and signed checkpoint submission
 scripts/         Pinned model download and two-miner rehearsal
 tests/          Scoring, protocol, process, and chain integration checks
 docs/           Setup details, benchmark methodology, and experiment history
+skills/         Installable own-data fine-tuning workflow
 website/        Static public dashboard and recorded benchmark comparison
 examples/       Public diagnostic cases and smoke-training data
 requirements/   Pinned model, signing, and optional testnet dependencies
