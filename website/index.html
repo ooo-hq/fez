@@ -37,7 +37,7 @@
       <div class="overview-copy">
         <span class="badge"><span class="status-dot"></span> Experimental candidate</span>
         <h1 id="overview-title">Decisions,<br>measured.</h1>
-        <p class="lead">A small model for yes/no decisions, choices, and scores. Built on Kev’s 0.8B model. Improved through a training competition.</p>
+        <p class="lead">An experimental 0.8B model for yes/no decisions, choices, and scores, with a Bittensor training competition.</p>
         <div class="hero-actions"><a class="button primary" href="#quality">Explore the results <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/ooo-hq/fez">View on GitHub <span aria-hidden="true">↗</span></a></div>
       </div>
       <div class="model-note">
@@ -46,7 +46,7 @@
         <p>Fez returns structured probabilities without generating a text answer. Applications can load a selected checkpoint directly.</p>
         <div class="model-status"><span class="outline-dot"></span> No public model release yet</div>
       </div>
-      <div class="checkpoint-strip"><span>Latest recorded candidate</span><code id="candidate-hash">Loading checkpoint…</code><a href="./data/jevbench-public-001.json">Inspect source <span aria-hidden="true">↗</span></a></div>
+      <div class="checkpoint-strip"><span>Public benchmark candidate</span><code id="candidate-hash">Loading checkpoint…</code><a href="./data/jevbench-public-001.json">Inspect source <span aria-hidden="true">↗</span></a></div>
     </section>
 
     <section id="quality" aria-labelledby="quality-title">
@@ -65,25 +65,25 @@
         <li><span class="step">3</span><h3>Evaluate</h3><p>The validator verifies the checkpoint and runs its own evaluation of the model’s probabilities.</p></li>
         <li><span class="step">4</span><h3>Reward</h3><p>Family-macro Brier skill determines proposed weights across eligible candidates.</p></li>
       </ol>
-      <div class="empty-state"><span class="empty-icon" aria-hidden="true">⇄</span><div><h3>No live round feed connected</h3><p>Submission queue, round phase, and evaluation history are unavailable.</p></div><span class="badge neutral">Awaiting observations</span></div>
+      <div class="empty-state"><span class="empty-icon" aria-hidden="true">⇄</span><div><h3>No live round feed connected</h3><p>One testnet round is recorded below. A live submission queue and round feed are unavailable.</p></div><span class="badge neutral">Awaiting observations</span></div>
       <p class="footnote">The local loop works on Apple Silicon and an RTX 4090. There is no automatic winner promotion. Accuracy and latency are diagnostics, not separate reward components. The subnet’s family-macro Brier and JevBench Brier use different aggregation rules.</p>
     </section>
 
     <section id="participants" aria-labelledby="participants-title">
-      <div class="section-heading"><div><h2 id="participants-title">Participants</h2><p>A local rehearsal was run. Current availability is unknown.</p></div><a class="text-link" href="https://github.com/ooo-hq/fez/blob/main/docs/mining.md">Miner guide <span aria-hidden="true">↗</span></a></div>
+      <div class="section-heading"><div><h2 id="participants-title">Participants</h2><p>Three miners and one validator completed a closed testnet rehearsal.</p></div><a class="text-link" href="https://github.com/ooo-hq/fez/blob/main/docs/mining.md">Miner guide <span aria-hidden="true">↗</span></a></div>
       <div class="participants-panel">
         <div><span class="participant-icon" aria-hidden="true">M</span><div><h3>Miners</h3><p>Train and submit candidates</p></div><span class="unknown">Availability unknown</span></div>
         <div><span class="participant-icon" aria-hidden="true">V</span><div><h3>Validators</h3><p>Independently evaluate checkpoints</p></div><span class="unknown">Availability unknown</span></div>
       </div>
-      <p class="footnote">Historical completion does not establish that a participant is online. No public health observations or participant counts are available.</p>
+      <p class="footnote">One operator ran all four processes on one host. Services exited after the round; these are recorded participants, not current availability observations.</p>
     </section>
 
     <section id="testnet" aria-labelledby="testnet-title">
-      <div class="section-heading"><div><h2 id="testnet-title">Testnet publication</h2><p>The next milestone is a verified training-to-chain round.</p></div><span class="badge pending">Pending</span></div>
-      <div class="testnet-panel"><div class="testnet-intro"><span class="chain-icon" aria-hidden="true">◇</span><div><h3>Fresh testnet subnet pending</h3><p>No subnet ID is confirmed. No Fez weights have been published.</p></div><a class="text-link" href="https://github.com/ooo-hq/fez/blob/main/docs/testnet.md">Testnet status <span aria-hidden="true">↗</span></a></div>
-        <dl class="publication-grid"><div><dt>Network / subnet ID</dt><dd>Pending / Unconfirmed</dd></div><div><dt>Proposed weights</dt><dd>Unavailable</dd></div><div><dt>Publication receipt</dt><dd>Unavailable</dd></div><div><dt>Observed on-chain weights</dt><dd>Unverified</dd></div></dl>
+      <div class="section-heading"><div><h2 id="testnet-title">Testnet publication</h2><p>The first closed training-to-chain round is verified.</p></div><span class="badge neutral">Recorded round</span></div>
+      <div class="testnet-panel"><div class="testnet-intro"><span class="chain-icon" aria-hidden="true">◇</span><div><h3>Bittensor testnet · Subnet 579</h3><p>Three miner checkpoints were trained, evaluated, and assigned verified on-chain weights.</p></div><a class="text-link" href="https://github.com/ooo-hq/fez/blob/main/docs/testnet-round-001.md">Round evidence <span aria-hidden="true">↗</span></a></div>
+        <dl class="publication-grid"><div><dt>Network / subnet ID</dt><dd>Testnet / 579</dd></div><div><dt>Requested weights · UIDs 1–3</dt><dd>34.09% / 33.60% / 32.31%</dd></div><div><dt>Publication receipt</dt><dd>8081301-0008</dd></div><div><dt>Verified at block</dt><dd>8,081,345</dd></div></dl>
       </div>
-      <p class="footnote">A publication commitment alone does not establish that weights were applied. On-chain verification is a separate observation.</p>
+      <p class="footnote">Revealed weights were verified on 25 September 2026 at 06:40:01 UTC. This is a recorded rehearsal on reused synthetic development data, not a live feed, mainnet deployment, or evidence of miner earnings.</p>
     </section>
 
     <footer><a class="footer-brand" href="#overview">fez<span>Small model. Open evidence.</span></a><div><a href="https://github.com/ooo-hq/fez/blob/main/docs/experiments.md">Experiment history</a><a href="https://github.com/ooo-hq/fez/blob/main/docs/roadmap.md">Roadmap</a><span>Public, read-only</span></div></footer>

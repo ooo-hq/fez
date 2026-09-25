@@ -1,5 +1,9 @@
 # Fez on Bittensor testnet
 
+The [first closed round](testnet-round-001.md) completed on **testnet subnet 579**
+on September 25, 2026. Three fresh checkpoints were trained and scored; their
+timelocked weights were revealed and independently verified on-chain.
+
 The fleet has an optional Bittensor path for a **closed testnet rehearsal**.
 The subnet ID is configured explicitly; mainnet is rejected. It uses registered
 wallet hotkeys for signed submissions, checks UID ↔
@@ -135,7 +139,9 @@ uniform rewards when every candidate fails.
 Validation: `python -m unittest discover -v` with model, signing and testnet
 dependencies installed. Chain tests fake external RPC only; wallet signatures,
 SDK intent construction, report binding, durable receipts and restart handling
-run against real code. Live preflight is read-only; transaction inclusion and
-commit reveal have not yet been exercised by Fez.
+run against real code. The first live round also exercised transaction inclusion,
+commit–reveal, and recovery after confirmation was interrupted. An SDK result
+with an unknown outcome remains `unknown` even when its success flag is false;
+inspect the chain before recovery or retry.
 
 SDK reference: [Bittensor set-weights](https://www.bittensor.com/docs/tx/set-weights).

@@ -19,8 +19,9 @@ weights. The resulting adapter and decision head can be loaded with the pinned
 base model for applications to use.
 
 **Status:** local training and evaluation work on Apple Silicon and an RTX 4090.
-Registered testnet mode is implemented; the first live training-to-chain round
-is pending. A Fez testnet subnet ID has not been published.
+The first closed training-to-chain round completed on **testnet subnet 579**, with
+three fresh miner checkpoints and verified revealed weights. See the
+[recorded result and limitations](docs/testnet-round-001.md).
 There is no published Fez model release or automatic winner promotion yet.
 
 [Documentation](docs/README.md) covers operation, development, evaluation, and
@@ -61,7 +62,7 @@ available, and the current subnet accepts only its pinned 0.8B architecture;
 
 ### Repository setup
 
-The public dashboard is intended for `fez.chat/model` in the existing Fez website.
+The public dashboard is available at [fez.chat/model](https://fez.chat/model).
 For a standalone local preview, see [`website/`](website/README.md). With
 Node.js 22+ and Python 3 installed, run `npm --prefix website run preview` and
 open <http://127.0.0.1:4173>. No model environment or wallet is needed.
@@ -70,7 +71,7 @@ Use macOS, Linux, or WSL 2 with Python 3.13, Git, and `uv` installed.
 Run these commands from the repository root:
 
 ```bash
-git clone git@github.com:ooo-hq/fez.git
+git clone https://github.com/ooo-hq/fez.git
 cd fez
 uv venv --python 3.13 .venv-kev
 uv pip install --python .venv-kev/bin/python -r requirements/model.txt -r requirements/rehearsal.txt

@@ -1,7 +1,8 @@
 # Next milestones
 
-The local training loop and guarded testnet integration are implemented. The next
-milestone is one registered training-to-chain round on a fresh testnet subnet.
+The local training loop and guarded testnet integration are implemented. The
+[first registered training-to-chain round](testnet-round-001.md) completed on
+testnet subnet 579, including verification after commit–reveal.
 Public discovery, isolated untrusted-model evaluation, benchmark refresh, and
 model release/promotion rules remain work for an open competition.
 
@@ -21,6 +22,6 @@ Use Teutonic's visibility into model progress as inspiration. Fez's dashboard
 should report its decision-model results; percentages from different benchmark
 suites must not be presented as directly comparable.
 
-The [website specification](website-handoff.md) defines an initial read-only dashboard
-using recorded public benchmark data. Live subnet views follow a verified testnet
-round and an explicit public aggregate feed; unavailable data stays labeled.
+The [public model page](https://fez.chat/model) presents recorded benchmark results
+and the verified testnet round. Live subnet views require an explicit public
+aggregate feed; unavailable data stays labeled.

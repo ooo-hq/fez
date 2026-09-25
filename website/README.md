@@ -40,7 +40,8 @@ request followed by successful retry. There is also a no-JavaScript source link.
 source only when updating this recorded experiment, then rebuild. Loading and
 validation failures show an error with retry; optional missing metrics display
 “Unavailable.” The page records evidence timestamps in UTC, never a fabricated
-live refresh time. All subnet states are explicitly unavailable or pending.
+live refresh time. The testnet section links to the recorded subnet 579 evidence. It does not
+report live participant availability.
 
 The build copies five explicitly named frontend files and that JSON. It does not
 copy repository folders, raw runs, model artifacts, private configuration, or
@@ -49,7 +50,6 @@ build of `website/dist/`; never serve the repository root publicly.
 
 The `/model` integration belongs to the existing `fez-web` hosting project.
 Do not deploy this standalone output over the main homepage or the separate
-`docs.fez.chat` manual. Only the public benchmark snapshot is transferred into
-the website app; its route renders the results at build time without a live feed.
-See [the handoff](../docs/website-handoff.md) and
-[benchmark methodology](../docs/jevbench-public.md) for scope and limitations.
+`docs.fez.chat` manual. The website app renders public benchmark and testnet snapshots at build time
+without a live feed. See the [benchmark methodology](../docs/jevbench-public.md)
+and [verified testnet round](../docs/testnet-round-001.md) for scope and limitations.
