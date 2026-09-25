@@ -1,6 +1,8 @@
-<img src="subnet.png" alt="Fez mascot wearing a fez" width="120" align="right">
+<p align="center">
+  <img src="subnet.png" alt="Fez mascot wearing a fez" width="96">
+</p>
 
-# Fez
+<h1 align="center">Fez</h1>
 
 **A small decision model improved through a Bittensor training competition.**
 Fez builds on [Kev](https://github.com/jaredpalmer/kev)'s 0.8B model to return
