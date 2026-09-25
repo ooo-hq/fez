@@ -40,6 +40,11 @@ miner-reported scores. See the [evaluation contract](docs/evaluation.md).
 
 ## Setup
 
+The public dashboard is intended for `fez.chat/model` in the existing Fez website.
+For a standalone local preview, see [`website/`](website/README.md). With
+Node.js 22+ and Python 3 installed, run `npm --prefix website run preview` and
+open <http://127.0.0.1:4173>. No model environment or wallet is needed.
+
 Use macOS, Linux, or WSL 2 with Python 3.13, Git, and `uv` installed.
 Run these commands from the repository root:
 
@@ -96,6 +101,7 @@ miner/           Training and signed checkpoint submission
 scripts/         Pinned model download and two-miner rehearsal
 tests/          Scoring, protocol, process, and chain integration checks
 docs/           Setup details, benchmark methodology, and experiment history
+website/        Static public dashboard and recorded benchmark comparison
 examples/       Public diagnostic cases and smoke-training data
 requirements/   Pinned model, signing, and optional testnet dependencies
 ```
