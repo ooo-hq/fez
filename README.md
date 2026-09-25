@@ -8,9 +8,9 @@
   <a href="https://fez.chat/model">fez.chat/model</a>
 </p>
 
-**A small decision model improved through a Bittensor training competition.**
-Fez builds on [Kev](https://github.com/jaredpalmer/kev)'s 0.8B model to return
-probabilities for yes/no decisions, choices, and scores without generating text.
+**A small decision model with a Bittensor training competition.**
+Fez returns probabilities for yes/no decisions, choices, and scores without
+generating text. The current model is an experimental 0.8B candidate.
 This repository contains the miner, validator, benchmark, and testnet integration.
 
 Miners fine-tune the model and submit checkpoints. The validator runs those
@@ -49,10 +49,10 @@ agent:
 npx skills add ooo-hq/fez@fez-finetune
 ```
 
-Then ask: “Fine-tune a Fez candidate on my labelled support tickets using Kev-4B.”
-The skill supports Kev 0.8B, 4B, and 9B starting checkpoints, data preparation,
-calibration, baseline comparisons, and optional serving. It reuses pinned Kev
-tools; cloud training requires a Modal account and an agreed compute budget.
+Then ask: “Fine-tune a 4B Fez candidate on my labelled support tickets.”
+The skill supports 0.8B, 4B, and 9B starting checkpoints, data preparation,
+calibration, baseline comparisons, and optional serving. Cloud training requires
+a Modal account and an agreed compute budget.
 Installing the skill starts no training and needs no GPU.
 
 Outputs are experimental Fez candidates. Published Fez weights are not yet
@@ -77,8 +77,8 @@ uv pip install --python .venv-kev/bin/python -r requirements/model.txt -r requir
 .venv-kev/bin/python -m scripts.download_models
 ```
 
-Dependencies, Kev's source, the public reference checkpoint, and the base model
-are pinned. Downloads happen once; model workers run from the local cache.
+Dependencies, the model runtime, the public reference checkpoint, and the base
+model are pinned. Downloads happen once; model workers run from the local cache.
 For Windows GPU and network setup, follow the [miner guide](docs/mining.md).
 The Bittensor SDK is optional until [testnet setup](docs/testnet.md).
 
@@ -148,6 +148,15 @@ shorter two-miner rehearsal. Commands use `python -m ...`; old flat script paths
 have been replaced. Existing standalone miner bundles keep their bundled code;
 regenerate bundles when upgrading them.
 
+## Model provenance
+
+Fez fine-tunes published [Kev](https://github.com/jaredpalmer/kev) checkpoints
+and uses its pinned training and serving tools. The current 0.8B candidate builds
+on Qwen3.5-0.8B-Base through Kev. The public JevBench comparison uses the unchanged
+published checkpoint as its baseline to measure what Fez's training changed.
+Exact source and model revisions are recorded in the
+[experiment methodology](docs/experiments.md#runtime-and-reference-models).
+
 ## Results and limits
 
 The latest larger-data experiment scored **976/1,120 correct (87.14%)**, versus
@@ -168,5 +177,5 @@ Public discovery, independent hidden evaluation, and model promotion remain
 [future work](docs/roadmap.md).
 
 Model weights, wallets, private datasets, bundles, and raw runs are excluded
-from Git. A fresh clone downloads the public Kev reference and generates new
+from Git. A fresh clone downloads the public reference and generates new
 local data; it does not contain the experimental Fez checkpoints.
