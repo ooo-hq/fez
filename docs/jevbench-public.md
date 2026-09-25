@@ -47,8 +47,9 @@ Every public item fit the 8,192-token row limit without truncation. An exact
 normalized-state audit found no matches in the recorded local training sets;
 semantic overlap and upstream pretraining contamination remain unknown.
 
-Local evidence is in `runs/jevbench-public-001/`: the predeclared protocol,
-frozen inputs, raw responses, per-item results, verification logs, and full
-method. Only aggregate data is committed. Remote and independent local checks
+Raw responses, per-item results, frozen inputs, and verification logs are retained
+as private experiment records. Only aggregate data is published. The experimental
+Fez checkpoint is not distributed, so the full comparison cannot be reproduced
+from this checkout alone. Checks on the GPU host and an independent local check
 verified coverage, request construction, response hashes, checkpoint integrity,
-and recomputed scores. Both GPU servers exited; no training or chain write ran.
+and recomputed scores. No training or chain write ran during the comparison.

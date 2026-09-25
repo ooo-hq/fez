@@ -12,8 +12,11 @@ base model for applications to use.
 
 **Status:** local training and evaluation work on Apple Silicon and an RTX 4090.
 Registered testnet mode is implemented; the first live training-to-chain round
-is pending. Fez will use a fresh testnet subnet. Bazaar's subnet 553 stays separate.
+is pending. A Fez testnet subnet ID has not been published.
 There is no published Fez model release or automatic winner promotion yet.
+
+[Documentation](docs/README.md) covers operation, development, evaluation, and
+measured results.
 
 ## How it works
 

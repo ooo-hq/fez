@@ -53,7 +53,7 @@ The miner selects CUDA, then Apple MPS, then CPU. Use `--device cuda`, `mps`, or
 `cpu` to select explicitly. To reuse an environment or cache, set `FEZ_PYTHON`
 to its absolute Python path and `HF_HOME` to the cache directory.
 
-### Windows / RTX 4090
+### Windows / NVIDIA GPU
 
 Run the miner inside WSL 2, using the supported NVIDIA driver installed on
 Windows. Do not install a Linux NVIDIA display driver inside WSL. Check CUDA

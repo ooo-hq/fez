@@ -15,8 +15,7 @@ stop an existing validator, or launch background services.
 
 ## Provision the registered identities
 
-Fez is targeting a fresh subnet, leaving Bazaar's subnet 553 unchanged. Before
-generating a fleet, fund a dedicated testnet wallet, register a subnet, and
+Before generating a fleet, fund a dedicated testnet wallet, register a subnet, and
 register the validator/miner hotkeys on the returned subnet ID. Use the live
 chain's registration cost and activation requirements; owning a new subnet
 does not itself make emissions active.
@@ -78,7 +77,7 @@ silently reassigned to a replacement hotkey.
 
 ## Run one round
 
-Start each miner with `./start-miner --rounds 1`. On the validator Mac, run:
+Start each miner with `./start-miner --rounds 1`. On the validator host, run:
 
 ```bash
 .venv-kev/bin/python -m fez.fleet validator \
@@ -91,9 +90,8 @@ reports the chain's cooldown instead. The private report records the registered
 identities it evaluated; old local rehearsal reports cannot be published as
 testnet results.
 
-After inspection, enable publication for the new subnet. Only one validator
-process should write for its hotkey. The Bazaar validator can keep running on
-553 because it has a different subnet and hotkey.
+After inspection, enable publication for the registered subnet. Only one validator
+process should write for its hotkey on that subnet.
 
 Publish the completed round, substituting its directory for `ROUND`:
 
