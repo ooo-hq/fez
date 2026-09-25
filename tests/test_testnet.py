@@ -13,7 +13,7 @@ from unittest.mock import patch
 @unittest.skipUnless(importlib.util.find_spec("bittensor"), "install requirements/testnet.txt")
 class TestnetTest(unittest.TestCase):
     def test_registration_and_publication_fail_closed(self):
-        from bittensor.result import ExtrinsicResult
+        from bittensor.result import ChainError, ErrorCode, ExtrinsicResult
 
         from fez import testnet as t
 
@@ -133,6 +133,27 @@ class TestnetTest(unittest.TestCase):
                 t.publish_round(config, work, report, sub, wallet, publish=True), receipt
             )
             self.assertEqual(sub.calls, 1)
+        # A lost subscription can be returned as a failed SDK result even after inclusion.
+        lost = ChainError("Connection lost waiting for finalization", code=ErrorCode.UNKNOWN)
+        for outcome in (ExtrinsicResult(False, error=lost), ExtrinsicResult(False), lost):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as tmp:
+                work = Path(tmp)
+                options = (
+                    {"side_effect": outcome}
+                    if isinstance(outcome, Exception)
+                    else {"return_value": outcome}
+                )
+                with patch.object(sub, "execute", **options) as execute:
+                    receipt = t.publish_round(config, work, report, sub, wallet, publish=True)
+                    self.assertEqual(receipt["status"], "unknown")
+                    self.assertIsNone(receipt["chain_write"])
+                    self.assertEqual(json.loads((work / "chain-receipt.json").read_text()), receipt)
+                    self.assertEqual(
+                        t.publish_round(config, work, report, sub, wallet, publish=True), receipt
+                    )
+                    self.assertEqual(
+                        execute.call_count, 1, "uncertain outcomes must never be retried"
+                    )
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)
             state["LastUpdate"][0] = 240
@@ -160,7 +181,13 @@ class TestnetTest(unittest.TestCase):
             state["Uids"]["miner-b"] = 2
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(
-                sub, "execute", return_value=ExtrinsicResult(False, message="rejected")
+                sub,
+                "execute",
+                return_value=ExtrinsicResult(
+                    False,
+                    message="rejected",
+                    error=ChainError("rejected", code=ErrorCode.INVALID_ARGUMENT),
+                ),
             ):
                 receipt = t.publish_round(config, Path(tmp), report, sub, wallet, publish=True)
             self.assertEqual(receipt["status"], "failed")

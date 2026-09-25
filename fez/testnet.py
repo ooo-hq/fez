@@ -166,15 +166,28 @@ def publish_round(config, work, report, sub, wallet, *, publish=False):
         result = sub.execute(
             intent, wallet, wait_for_inclusion=True, wait_for_finalization=True, retries=0
         )
+        # The SDK can return a failed result after losing the inclusion subscription.
+        uncertain = not result.success and (
+            result.error is None or result.error.code == bt.ErrorCode.UNKNOWN
+        )
         record.update(
             receipt=result.to_dict(),
-            chain_write=bool(result.success),
-            status=("committed" if state["commit_reveal"] else "included")
-            if result.success
-            else "failed",
+            chain_write=None if uncertain else bool(result.success),
+            status="unknown"
+            if uncertain
+            else (
+                ("committed" if state["commit_reveal"] else "included")
+                if result.success
+                else "failed"
+            ),
         )
     except bt.ChainError as error:
-        record.update(status="failed", error=error.to_dict())
+        uncertain = error.code == bt.ErrorCode.UNKNOWN
+        record.update(
+            status="unknown" if uncertain else "failed",
+            chain_write=None if uncertain else False,
+            error=error.to_dict(),
+        )
     except Exception as error:
         # A lost connection may follow a successful submission. Keep the durable attempt for inspection.
         record.update(status="unknown", chain_write=None, detail=str(error)[:400])
