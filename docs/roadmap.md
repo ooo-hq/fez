@@ -19,5 +19,8 @@ Dashboard requirements saved from the Teutonic discussion (2026-09-24):
 
 Use Teutonic's visibility into model progress as inspiration. Fez's dashboard
 should report its decision-model results; percentages from different benchmark
-suites must not be presented as directly comparable. Dashboard implementation
-is deferred until the subnet loop works on testnet.
+suites must not be presented as directly comparable.
+
+The [website handoff](website-handoff.md) defines an initial read-only dashboard
+using recorded public benchmark data. Live subnet views follow a verified testnet
+round and an explicit public aggregate feed; unavailable data stays labeled.

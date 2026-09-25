@@ -445,3 +445,13 @@ cases and remains an experimental artifact. No reference promotion or chain
 write occurred; all PC training workers exited. The new test is now exposed.
 
 Full measurements and artifact: `runs/fez-4090-opt-001/README.md` (local).
+
+## External JevBench public comparison
+
+The frozen current Fez and published Kev 0.8B each scored 147/231 (63.64%)
+on JevBench's released public items, using the same RTX 4090 and FP32 runtime.
+Fez corrected six errors and introduced six. Brier loss and ECE worsened,
+and confident mistakes increased from three to eight. The saved temperatures
+were retained; there was no JevBench-directed fitting or training.
+The [comparison report](jevbench-public.md) records the verified results,
+timing scope, public-only limitation, and downloadable aggregate data.

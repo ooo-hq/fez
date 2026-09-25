@@ -114,6 +114,10 @@ experimental comparison, not a general claim that Fez beats Kev.
 [Experiment history](docs/experiments.md#optimized-4090-training-and-a-larger-dataset)
 records the datasets, settings, and tradeoffs.
 
+On the separate [JevBench public comparison](docs/jevbench-public.md), current
+Fez and published Kev tied at 147/231 correct (63.64%); Fez's confidence quality
+regressed. No official JevBench rank has been measured.
+
 The [synthetic benchmark](docs/benchmark.md) has shared templates and is reused
 for development. The current private-LAN services are for operator-controlled
 checkpoints; their subprocesses are not an untrusted-model security sandbox.
